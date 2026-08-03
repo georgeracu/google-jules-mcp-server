@@ -1,0 +1,135 @@
+import { formatActivitySummary } from "../activities/format.js";
+import type { ActivityList } from "../activities/schemas.js";
+import type { Session, SessionList } from "./schemas.js";
+
+export function formatSessionList(data: SessionList): string {
+  if (!data.sessions || data.sessions.length === 0) {
+    return "No sessions found. Create one with jules_create_session.";
+  }
+
+  const sessionsList = data.sessions
+    .map((session, index) => {
+      const prUrl = session.outputs?.[0]?.pullRequest?.url;
+      const prInfo = prUrl ? `\n  PR: ${prUrl}` : "";
+      return (
+        `${index + 1}. ${session.title ?? "Untitled"}\n` +
+        `   ID: ${session.id}\n` +
+        `   State: ${session.state}\n` +
+        `   Created: ${session.createTime ?? "unknown"}${prInfo}`
+      );
+    })
+    .join("\n\n");
+
+  let response = `Your Jules sessions (${data.sessions.length}):\n\n${sessionsList}`;
+  if (data.nextPageToken) {
+    response += `\n\nMore results available. Use pageToken: ${data.nextPageToken}`;
+  }
+  return response;
+}
+
+export function formatSessionCreated(
+  session: Session,
+  params: {
+    repoOwner: string;
+    repoName: string;
+    branch: string;
+    autoApprove: boolean;
+    autoCreatePR: boolean;
+  }
+): string {
+  const approvalNote = params.autoApprove
+    ? ""
+    : "\n\nNote: Manual plan approval required. Use jules_list_activities to see the plan, then jules_approve_plan to proceed.";
+
+  return (
+    "Session created successfully!\n\n" +
+    `Session ID: ${session.id}\n` +
+    `Title: ${session.title}\n` +
+    `Repository: ${params.repoOwner}/${params.repoName}\n` +
+    `Branch: ${params.branch}\n` +
+    `State: ${session.state}\n` +
+    `Auto-create PR: ${params.autoCreatePR}${approvalNote}\n\n` +
+    "Jules is now working asynchronously in an isolated cloud VM.\n" +
+    `Use jules_get_status with session ID "${session.id}" to check progress.`
+  );
+}
+
+function formatStateGuidance(session: Session): string {
+  switch (session.state) {
+    case "COMPLETED":
+      return "\n\nSession complete! Use jules_get_session_output for detailed results.";
+    case "FAILED":
+      return "\n\nSession failed. Use jules_list_activities to see detailed error information.";
+    case "AWAITING_PLAN_APPROVAL":
+      return "\n\nSession awaiting plan approval. Use jules_list_activities to see the plan, then jules_approve_plan to proceed.";
+    case "AWAITING_USER_FEEDBACK":
+      return "\n\nSession is waiting on you. Use jules_list_activities to see what Jules is asking, then jules_send_message to respond.";
+    case "PAUSED":
+      return "\n\nSession is paused.";
+    case "QUEUED":
+    case "PLANNING":
+    case "IN_PROGRESS":
+      return "\n\nSession still running. Poll again in 10-30 seconds for updates.";
+    default:
+      return "";
+  }
+}
+
+export function formatSessionStatus(session: Session, activities: ActivityList): string {
+  let statusText = `Session: ${session.title ?? "Untitled"}\nState: ${session.state}\nPrompt: ${session.prompt}\n\n`;
+
+  const pr = session.outputs?.[0]?.pullRequest;
+  if (pr) {
+    statusText += "Pull Request Created:\n";
+    statusText += `  URL: ${pr.url}\n`;
+    statusText += `  Title: ${pr.title}\n`;
+    if (pr.description) statusText += `  Description: ${pr.description}\n`;
+    statusText += "\n";
+  }
+
+  if (activities.activities && activities.activities.length > 0) {
+    statusText += `Recent Activity (${activities.activities.length}):\n`;
+    activities.activities.forEach((activity, index) => {
+      const originator = activity.originator ?? "unknown";
+      statusText += `\n${index + 1}. [${originator}] ${formatActivitySummary(activity)}`;
+    });
+  } else {
+    statusText += "No activities yet - session starting up.";
+  }
+
+  return statusText + formatStateGuidance(session);
+}
+
+export function formatSessionOutput(session: Session): string {
+  if (session.state !== "COMPLETED") {
+    return (
+      `Session ${session.id} is not yet completed.\n\n` +
+      `Current state: ${session.state}\n\n` +
+      "Use jules_get_status to monitor progress until state is COMPLETED."
+    );
+  }
+
+  const pr = session.outputs?.[0]?.pullRequest;
+  if (!pr) {
+    return (
+      "Session completed but no pull request was created.\n\n" +
+      `Title: ${session.title}\n` +
+      `Prompt: ${session.prompt}\n\n` +
+      "This may be expected if the task didn't require code changes, " +
+      "or if automationMode was not set to AUTO_CREATE_PR."
+    );
+  }
+
+  return (
+    "Session Output:\n\n" +
+    `Session: ${session.title}\n` +
+    `State: ${session.state}\n\n` +
+    "Pull Request:\n" +
+    `  URL: ${pr.url}\n` +
+    `  Title: ${pr.title}\n` +
+    (pr.number ? `  Number: #${pr.number}\n` : "") +
+    (pr.description ? `  Description: ${pr.description}\n` : "") +
+    "\n" +
+    "Visit the PR URL to review changes and merge when ready."
+  );
+}
