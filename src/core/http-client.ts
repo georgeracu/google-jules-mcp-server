@@ -1,8 +1,21 @@
+import { EnvHttpProxyAgent } from "undici";
 import type { z } from "zod";
 
 import { JULES_API_BASE } from "./config.js";
 import { JulesNetworkError, JulesResponseValidationError, mapResponseToError } from "./errors.js";
 import { DEFAULT_RETRY_POLICY, retryWithBackoff, type RetryPolicy } from "./retry.js";
+
+/**
+ * Honours HTTP_PROXY/HTTPS_PROXY/NO_PROXY, as set by enterprise proxies, without
+ * any config on our side — falls through to a direct connection when unset.
+ *
+ * Cast to RequestInit["dispatcher"]: the `undici` package ships its own Dispatcher
+ * type, structurally near-identical to but not assignable to the `undici-types`
+ * Dispatcher that Node's global fetch typing uses.
+ */
+const proxyDispatcher = new EnvHttpProxyAgent() as unknown as NonNullable<
+  RequestInit["dispatcher"]
+>;
 
 /**
  * The only path from a raw fetch response to a typed value: every resource
@@ -44,6 +57,7 @@ export class JulesHttpClient {
     try {
       response = await fetch(url, {
         ...init,
+        dispatcher: proxyDispatcher,
         headers: {
           "X-Goog-Api-Key": this.apiKey,
           "Content-Type": "application/json",

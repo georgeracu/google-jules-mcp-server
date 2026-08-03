@@ -31,7 +31,10 @@ function formatPlanSteps(
 }
 
 /** Shared by formatActivityDetail (indent "") and formatActivityListItem (indent "   "). */
-function formatArtifactBullets(artifacts: NonNullable<Activity["artifacts"]>, indent: string): string {
+function formatArtifactBullets(
+  artifacts: NonNullable<Activity["artifacts"]>,
+  indent: string
+): string {
   return artifacts.map((a) => `${indent}${formatArtifactBullet(a)}\n`).join("");
 }
 

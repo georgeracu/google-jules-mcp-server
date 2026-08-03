@@ -142,6 +142,27 @@ describe("JulesHttpClient", () => {
     );
   });
 
+  describe("proxy dispatcher", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("passes a dispatcher to fetch so HTTP_PROXY/HTTPS_PROXY are honored", async () => {
+      const fetchSpy: typeof fetch = vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const client = makeClient();
+      await client.request("/ping", z.object({ ok: z.boolean() }));
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [calledUrl, calledInit] = vi.mocked(fetchSpy).mock.calls[0];
+      expect(calledUrl).toBe(`${BASE}/ping`);
+      expect(calledInit?.dispatcher).toBeDefined();
+    });
+  });
+
   it("exposes retryAfterMs on JulesRateLimitError when retries are exhausted", async () => {
     server.use(
       http.get(`${BASE}/still-limited`, () =>
