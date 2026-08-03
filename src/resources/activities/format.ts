@@ -16,6 +16,25 @@ function formatArtifactBullet(artifact: NonNullable<Activity["artifacts"]>[numbe
   return "- Unknown artifact";
 }
 
+/** Shared by formatActivityDetail (indent "") and formatActivityListItem (indent "   "). */
+function formatPlanSteps(
+  steps: NonNullable<NonNullable<Activity["planGenerated"]>["plan"]>["steps"],
+  indent: string
+): string {
+  return (steps ?? [])
+    .map(
+      (step, i) =>
+        `${indent}${i + 1}. ${step.title}\n` +
+        (step.description ? `${indent}   ${step.description}\n` : "")
+    )
+    .join("");
+}
+
+/** Shared by formatActivityDetail (indent "") and formatActivityListItem (indent "   "). */
+function formatArtifactBullets(artifacts: NonNullable<Activity["artifacts"]>, indent: string): string {
+  return artifacts.map((a) => `${indent}${formatArtifactBullet(a)}\n`).join("");
+}
+
 /** Single-line variant summary used in jules_get_status's recent-activity digest. */
 export function formatActivitySummary(activity: Activity): string {
   if (activity.planGenerated) {
@@ -40,13 +59,7 @@ export function formatActivityDetail(activity: Activity): string {
   const header = `[${activity.originator ?? "unknown"}] ${activity.createTime ?? "no timestamp"}\n\n`;
 
   if (activity.planGenerated) {
-    const steps = activity.planGenerated.plan?.steps ?? [];
-    const stepLines = steps
-      .map(
-        (step, i) =>
-          `${i + 1}. ${step.title}\n` + (step.description ? `   ${step.description}\n` : "")
-      )
-      .join("");
+    const stepLines = formatPlanSteps(activity.planGenerated.plan?.steps, "");
     return `${header}Generated execution plan:\n${stepLines}`;
   }
   if (activity.planApproved) return `${header}Plan approved`;
@@ -69,7 +82,7 @@ export function formatActivityDetail(activity: Activity): string {
     return `${header}Session failed${reason}`;
   }
   if (activity.artifacts?.length) {
-    const bullets = activity.artifacts.map((a) => `${formatArtifactBullet(a)}\n`).join("");
+    const bullets = formatArtifactBullets(activity.artifacts, "");
     return `${header}Produced ${activity.artifacts.length} artifact(s):\n${bullets}`;
   }
   return `${header}Activity occurred`;
@@ -85,12 +98,7 @@ function formatActivityListItem(activity: Activity, index: number): string {
     body += "   Generated execution plan:\n";
     if (steps.length > 0) {
       body += "   Steps:\n";
-      body += steps
-        .map(
-          (step, i) =>
-            `   ${i + 1}. ${step.title}\n` + (step.description ? `      ${step.description}\n` : "")
-        )
-        .join("");
+      body += formatPlanSteps(steps, "   ");
     }
   } else if (activity.planApproved) {
     body += "   Plan approved\n";
@@ -111,7 +119,7 @@ function formatActivityListItem(activity: Activity, index: number): string {
     if (activity.sessionFailed.reason) body += `   Reason: ${activity.sessionFailed.reason}\n`;
   } else if (activity.artifacts?.length) {
     body += `   Produced ${activity.artifacts.length} artifact(s):\n`;
-    body += activity.artifacts.map((a) => `   ${formatArtifactBullet(a)}\n`).join("");
+    body += formatArtifactBullets(activity.artifacts, "   ");
   } else {
     body += "   Activity occurred\n";
   }

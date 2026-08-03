@@ -15,9 +15,6 @@ async function main(): Promise<void> {
 
   logger.info("Jules MCP server running");
   logger.info(`Connected tools: ${TOOL_NAMES.length}`);
-  for (const name of TOOL_NAMES) {
-    logger.info(`  - ${name}`);
-  }
 }
 
 main().catch((error: unknown) => {

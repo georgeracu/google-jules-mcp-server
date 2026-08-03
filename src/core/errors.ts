@@ -1,23 +1,15 @@
 import type { z } from "zod";
 
-export abstract class JulesApiError extends Error {
-  abstract readonly kind:
-    "auth" | "not_found" | "rate_limit" | "server" | "client" | "network" | "validation";
-}
+export abstract class JulesApiError extends Error {}
 
 export class JulesAuthError extends JulesApiError {
-  readonly kind = "auth" as const;
-  constructor(
-    public readonly status: number,
-    message: string
-  ) {
+  constructor(message: string) {
     super(message);
     this.name = "JulesAuthError";
   }
 }
 
 export class JulesNotFoundError extends JulesApiError {
-  readonly kind = "not_found" as const;
   constructor(message: string) {
     super(message);
     this.name = "JulesNotFoundError";
@@ -25,7 +17,6 @@ export class JulesNotFoundError extends JulesApiError {
 }
 
 export class JulesRateLimitError extends JulesApiError {
-  readonly kind = "rate_limit" as const;
   constructor(
     message: string,
     public readonly retryAfterMs?: number
@@ -36,29 +27,20 @@ export class JulesRateLimitError extends JulesApiError {
 }
 
 export class JulesServerError extends JulesApiError {
-  readonly kind = "server" as const;
-  constructor(
-    public readonly status: number,
-    message: string
-  ) {
+  constructor(message: string) {
     super(message);
     this.name = "JulesServerError";
   }
 }
 
 export class JulesClientError extends JulesApiError {
-  readonly kind = "client" as const;
-  constructor(
-    public readonly status: number,
-    message: string
-  ) {
+  constructor(message: string) {
     super(message);
     this.name = "JulesClientError";
   }
 }
 
 export class JulesNetworkError extends JulesApiError {
-  readonly kind = "network" as const;
   constructor(message: string) {
     super(message);
     this.name = "JulesNetworkError";
@@ -66,7 +48,6 @@ export class JulesNetworkError extends JulesApiError {
 }
 
 export class JulesResponseValidationError extends JulesApiError {
-  readonly kind = "validation" as const;
   constructor(
     public readonly path: string,
     public readonly zodError: z.ZodError
@@ -114,7 +95,7 @@ export async function mapResponseToError(response: Response): Promise<JulesApiEr
   }
 
   if (response.status === 401 || response.status === 403) {
-    return new JulesAuthError(response.status, message);
+    return new JulesAuthError(message);
   }
   if (response.status === 404) {
     return new JulesNotFoundError(message);
@@ -123,9 +104,9 @@ export async function mapResponseToError(response: Response): Promise<JulesApiEr
     return new JulesRateLimitError(message, parseRetryAfterMs(response.headers.get("retry-after")));
   }
   if (response.status >= 500) {
-    return new JulesServerError(response.status, message);
+    return new JulesServerError(message);
   }
-  return new JulesClientError(response.status, message);
+  return new JulesClientError(message);
 }
 
 /**
