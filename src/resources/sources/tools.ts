@@ -12,12 +12,14 @@ export function createSourceHandlers(client: SourcesClient) {
     listSources: async ({
       pageSize,
       pageToken,
+      filter,
     }: {
       pageSize?: number;
       pageToken?: string;
+      filter?: string;
     }): Promise<ToolResult> => {
       try {
-        const data = await client.listSources({ pageSize, pageToken });
+        const data = await client.listSources({ pageSize, pageToken, filter });
         return textResult(formatSourceList(data));
       } catch (error) {
         return errorResult(`Error listing sources: ${formatErrorForUser(error)}`);
@@ -53,7 +55,13 @@ export function registerSourceTools(server: McpServer, client: SourcesClient): v
       title: "List Jules Sources",
       description:
         "List all GitHub repositories connected to Jules. You must install the Jules GitHub app at https://jules.google.com before repositories appear here.",
-      inputSchema: { ...PageParams },
+      inputSchema: {
+        ...PageParams,
+        filter: z
+          .string()
+          .optional()
+          .describe("AIP-160 filter expression to narrow the results (e.g. by repo owner)"),
+      },
     },
     handlers.listSources
   );

@@ -29,6 +29,20 @@ describe("SourcesClient", () => {
     expect(capturedUrl).toContain("pageToken=abc");
   });
 
+  it("listSources sends filter as a query param", async () => {
+    let capturedUrl: string | undefined;
+    server.use(
+      http.get(`${BASE}/sources`, ({ request }) => {
+        capturedUrl = request.url;
+        return HttpResponse.json(sourceListFixture);
+      })
+    );
+
+    await makeClient().listSources({ filter: "owner=acme" });
+
+    expect(capturedUrl).toContain(`filter=${encodeURIComponent("owner=acme")}`);
+  });
+
   it("getSource builds the sources/github/{owner}/{repo} path", async () => {
     let capturedPath: string | undefined;
     server.use(

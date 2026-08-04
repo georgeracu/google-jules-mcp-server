@@ -8,6 +8,7 @@ import {
 import {
   activityAgentMessagedFixture,
   activityArtifactsFixture,
+  activityDescriptionOnlyFixture,
   activityListFixture,
   activityNoVariantFixture,
   activityPlanApprovedFixture,
@@ -31,6 +32,12 @@ describe("formatActivitySummary", () => {
     [activityNoVariantFixture, "Activity occurred"],
   ])("renders %#", (activity, expected) => {
     expect(formatActivitySummary(activity)).toBe(expected);
+  });
+
+  it("falls back to the activity's own description when no known variant is present", () => {
+    expect(formatActivitySummary(activityDescriptionOnlyFixture)).toBe(
+      "Cloned repository and installed dependencies."
+    );
   });
 
   it("truncates long messages at 100 characters", () => {
@@ -67,6 +74,12 @@ describe("formatActivityDetail", () => {
 
   it("falls back to 'Activity occurred' when no variant is present", () => {
     expect(formatActivityDetail(activityNoVariantFixture)).toContain("Activity occurred");
+  });
+
+  it("falls back to the activity's own description when no known variant is present", () => {
+    expect(formatActivityDetail(activityDescriptionOnlyFixture)).toContain(
+      "Cloned repository and installed dependencies."
+    );
   });
 
   it("renders planApproved", () => {
