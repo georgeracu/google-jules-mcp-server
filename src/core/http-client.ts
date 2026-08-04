@@ -8,14 +8,8 @@ import { DEFAULT_RETRY_POLICY, retryWithBackoff, type RetryPolicy } from "./retr
 /**
  * Honours HTTP_PROXY/HTTPS_PROXY/NO_PROXY, as set by enterprise proxies, without
  * any config on our side — falls through to a direct connection when unset.
- *
- * Cast to RequestInit["dispatcher"]: the `undici` package ships its own Dispatcher
- * type, structurally near-identical to but not assignable to the `undici-types`
- * Dispatcher that Node's global fetch typing uses.
  */
-const proxyDispatcher = new EnvHttpProxyAgent() as unknown as NonNullable<
-  RequestInit["dispatcher"]
->;
+const proxyDispatcher: NonNullable<RequestInit["dispatcher"]> = new EnvHttpProxyAgent();
 
 /**
  * The only path from a raw fetch response to a typed value: every resource
