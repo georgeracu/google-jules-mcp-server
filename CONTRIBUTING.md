@@ -41,3 +41,14 @@ Formatting and lint rules are enforced by Prettier and ESLint (`npm run format`,
 ## Commit messages
 
 Clear, imperative summary of what changed and why (e.g. `Add retry backoff for 429 responses`). No required prefix convention.
+
+## Releasing
+
+Publishing to npm is automated via `.github/workflows/release.yml`, triggered by pushing a `vX.Y.Z` tag that matches `package.json`'s version:
+
+```bash
+npm version patch   # or minor / major — bumps package.json and creates the tag
+git push --follow-tags
+```
+
+The workflow re-runs lint/typecheck/tests/build (via `prepublishOnly`) and refuses to publish if the tag doesn't match `package.json`'s version, then runs `npm publish --provenance`. Requires the `NPM_TOKEN` repo secret (an npm Automation or Granular Access Token with publish rights) to be set.
