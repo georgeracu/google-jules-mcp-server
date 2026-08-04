@@ -94,7 +94,79 @@ cp .env.example .env
 claude mcp add jules -s user -e JULES_API_KEY=your_actual_jules_api_key_here -- npx -y google-jules-mcp-server
 ```
 
-If you installed globally instead, replace `"command": "npx", "args": ["-y", "google-jules-mcp-server"]` with `"command": "google-jules-mcp", "args": []` (and the `npx -y google-jules-mcp-server` in the Claude Code command with just `google-jules-mcp`).
+**GitHub Copilot CLI**:
+
+```bash
+copilot mcp add jules -e JULES_API_KEY=your_actual_jules_api_key_here -- npx -y google-jules-mcp-server
+```
+
+Or edit `~/.copilot/mcp-config.json` directly:
+
+```json
+{
+  "mcpServers": {
+    "jules": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "google-jules-mcp-server"],
+      "env": { "JULES_API_KEY": "your_actual_jules_api_key_here" },
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+**VS Code** (Copilot Chat agent mode) — via terminal:
+
+```bash
+code --add-mcp '{"name":"jules","command":"npx","args":["-y","google-jules-mcp-server"],"env":{"JULES_API_KEY":"your_actual_jules_api_key_here"}}'
+```
+
+Or add to `.vscode/mcp.json` (workspace) or via **MCP: Open User Configuration** (user-level):
+
+```json
+{
+  "servers": {
+    "jules": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "google-jules-mcp-server"],
+      "env": { "JULES_API_KEY": "your_actual_jules_api_key_here" }
+    }
+  }
+}
+```
+
+**Cursor** — add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project-only):
+
+```json
+{
+  "mcpServers": {
+    "jules": {
+      "command": "npx",
+      "args": ["-y", "google-jules-mcp-server"],
+      "env": { "JULES_API_KEY": "your_actual_jules_api_key_here" }
+    }
+  }
+}
+```
+
+**OpenAI Codex CLI**:
+
+```bash
+codex mcp add jules --env JULES_API_KEY=your_actual_jules_api_key_here -- npx -y google-jules-mcp-server
+```
+
+Or edit `~/.codex/config.toml` directly:
+
+```toml
+[mcp_servers.jules]
+command = "npx"
+args = ["-y", "google-jules-mcp-server"]
+env = { JULES_API_KEY = "your_actual_jules_api_key_here" }
+```
+
+If you installed globally instead, replace `"command": "npx", "args": ["-y", "google-jules-mcp-server"]` with `"command": "google-jules-mcp", "args": []` (and any `npx -y google-jules-mcp-server` in a CLI command above with just `google-jules-mcp`).
 
 If you're running from a local clone instead, use `"command": "node", "args": ["/absolute/path/to/google-jules-mcp-server/build/index.js"]` (an absolute path to `build/index.js`).
 
