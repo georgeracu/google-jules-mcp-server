@@ -45,13 +45,25 @@ jobs:
 
       - name: Sync server.json version with package.json
         run: |
-          pkg_version="$(node -p "require('./package.json').version")"
-          jq --arg v "$pkg_version" '.version = $v | .packages[0].version = $v' server.json > server.tmp
+          tag_version="${GITHUB_REF_NAME#v}"
+          jq --arg v "$tag_version" '.version = $v | .packages[0].version = $v' server.json > server.tmp
           mv server.tmp server.json
 
+      - uses: sigstore/cosign-installer@v3
+
       - name: Install mcp-publisher
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.0
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          asset="mcp-publisher_linux_amd64.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/$MCP_PUBLISHER_VERSION"
+          curl -sL -O "$base_url/$asset" -O "$base_url/$asset.sigstore.json"
+          cosign verify-blob \
+            --bundle "$asset.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/$MCP_PUBLISHER_VERSION" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$asset"
+          tar xz -f "$asset" mcp-publisher
 
       - name: Authenticate to MCP Registry
         run: ./mcp-publisher login github-oidc
