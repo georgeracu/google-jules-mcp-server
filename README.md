@@ -1,5 +1,9 @@
 # google-jules-mcp-server
 
+[![CI](https://github.com/georgeracu/google-jules-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/georgeracu/google-jules-mcp-server/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/georgeracu/google-jules-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/georgeracu/google-jules-mcp-server)
+[![npm version](https://img.shields.io/npm/v/google-jules-mcp-server.svg)](https://www.npmjs.com/package/google-jules-mcp-server)
+
 Model Context Protocol (MCP) server for Google's Jules AI coding agent — unofficial. Lets AI assistants like Claude create and manage asynchronous coding tasks through the Jules API v1alpha.
 
 ## Overview
