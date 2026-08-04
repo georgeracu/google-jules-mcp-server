@@ -44,12 +44,25 @@ Clear, imperative summary of what changed and why (e.g. `Add retry backoff for 4
 
 ## Releasing
 
-Publishing to npm is automated via `.github/workflows/release.yml`, triggered by pushing a `vX.Y.Z` tag that matches `package.json`'s version:
+Publishing to npm is automated via `.github/workflows/release.yml`, triggered by pushing a `vX.Y.Z` tag that matches `package.json`'s version. `main` requires a PR (no direct pushes, even for admins), so the version bump has to land before the tag:
 
 ```bash
-npm version patch   # or minor / major — bumps package.json and creates the tag
-git push --follow-tags
+git checkout -b release/vX.Y.Z
+npm version patch --no-git-tag-version   # or minor / major — bumps package.json only
+git commit -am "vX.Y.Z"
+git push -u origin release/vX.Y.Z
+gh pr create --fill
 ```
+
+Once that PR merges:
+
+```bash
+git checkout main && git pull
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+Tag pushes aren't covered by `main`'s branch protection, so this last step doesn't need a PR.
 
 The workflow re-runs lint/typecheck/tests/build (via `prepublishOnly`) and refuses to publish if the tag doesn't match `package.json`'s version, then runs `npm publish`. Authentication is via npm's [Trusted Publisher](https://docs.npmjs.com/trusted-publishers) (OIDC) — no stored npm token, and provenance attestation is generated automatically. This requires a one-time setup on npmjs.com: package Settings → Trusted Publisher → GitHub Actions, with organization/user `georgeracu`, repository `google-jules-mcp-server`, workflow filename `release.yml`, no environment.
 
