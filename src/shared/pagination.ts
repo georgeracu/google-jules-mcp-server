@@ -6,10 +6,15 @@ export const PageParams = {
   pageToken: z.string().optional().describe("Token for pagination to get the next page"),
 };
 
-export function buildPageQuery(params: { pageSize?: number; pageToken?: string }): string {
+export function buildPageQuery(params: {
+  pageSize?: number;
+  pageToken?: string;
+  filter?: string;
+}): string {
   const query = new URLSearchParams();
   if (params.pageSize !== undefined) query.set("pageSize", String(params.pageSize));
   if (params.pageToken) query.set("pageToken", params.pageToken);
+  if (params.filter) query.set("filter", params.filter);
   const qs = query.toString();
   return qs ? `?${qs}` : "";
 }

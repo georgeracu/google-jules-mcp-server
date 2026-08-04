@@ -5,7 +5,11 @@ import { SourceListSchema, SourceSchema, type Source, type SourceList } from "./
 export class SourcesClient {
   constructor(private readonly http: JulesHttpClient) {}
 
-  listSources(params: { pageSize?: number; pageToken?: string }): Promise<SourceList> {
+  listSources(params: {
+    pageSize?: number;
+    pageToken?: string;
+    filter?: string;
+  }): Promise<SourceList> {
     return this.http.request(`/sources${buildPageQuery(params)}`, SourceListSchema);
   }
 

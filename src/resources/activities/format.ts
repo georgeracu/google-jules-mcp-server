@@ -1,6 +1,7 @@
 import type { Activity, ActivityList } from "./schemas.js";
 
 const SUMMARY_TRUNCATE_LENGTH = 100;
+const UNKNOWN_ACTIVITY_TEXT = "Activity occurred";
 
 function truncate(text: string): string {
   return text.length > SUMMARY_TRUNCATE_LENGTH
@@ -54,7 +55,7 @@ export function formatActivitySummary(activity: Activity): string {
   if (activity.sessionFailed)
     return `Session failed: ${activity.sessionFailed.reason ?? "unknown error"}`;
   if (activity.artifacts?.length) return `Produced ${activity.artifacts.length} artifact(s)`;
-  return "Activity occurred";
+  return activity.description ?? UNKNOWN_ACTIVITY_TEXT;
 }
 
 /** Full multi-line rendering of one activity, used standalone by jules_get_activity. */
@@ -88,7 +89,7 @@ export function formatActivityDetail(activity: Activity): string {
     const bullets = formatArtifactBullets(activity.artifacts, "");
     return `${header}Produced ${activity.artifacts.length} artifact(s):\n${bullets}`;
   }
-  return `${header}Activity occurred`;
+  return `${header}${activity.description ?? UNKNOWN_ACTIVITY_TEXT}`;
 }
 
 function formatActivityListItem(activity: Activity, index: number): string {
@@ -124,7 +125,7 @@ function formatActivityListItem(activity: Activity, index: number): string {
     body += `   Produced ${activity.artifacts.length} artifact(s):\n`;
     body += formatArtifactBullets(activity.artifacts, "   ");
   } else {
-    body += "   Activity occurred\n";
+    body += `   ${activity.description ?? UNKNOWN_ACTIVITY_TEXT}\n`;
   }
 
   return body;

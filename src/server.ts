@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { createRequire } from "node:module";
 
 import { JulesHttpClient } from "./core/http-client.js";
 import { ActivitiesClient } from "./resources/activities/client.js";
@@ -7,6 +8,10 @@ import { SessionsClient } from "./resources/sessions/client.js";
 import { registerSessionTools } from "./resources/sessions/tools.js";
 import { SourcesClient } from "./resources/sources/client.js";
 import { registerSourceTools } from "./resources/sources/tools.js";
+
+export const { version } = createRequire(import.meta.url)("../package.json") as {
+  version: string;
+};
 
 export const TOOL_NAMES = [
   "jules_list_sources",
@@ -25,7 +30,7 @@ export const TOOL_NAMES = [
 ] as const;
 
 export function createServer(apiKey: string): McpServer {
-  const server = new McpServer({ name: "google-jules-mcp-server", version: "0.1.0" });
+  const server = new McpServer({ name: "google-jules-mcp-server", version });
 
   const http = new JulesHttpClient(apiKey);
   const sources = new SourcesClient(http);

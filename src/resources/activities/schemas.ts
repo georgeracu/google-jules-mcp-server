@@ -58,6 +58,7 @@ export type Artifact = z.infer<typeof ArtifactSchema>;
 export const ActivitySchema = z.object({
   name: z.string(),
   id: z.string().optional(),
+  description: z.string().optional(),
   createTime: z.string().optional(),
   originator: z.string().optional(),
   planGenerated: PlanGeneratedSchema.optional(),

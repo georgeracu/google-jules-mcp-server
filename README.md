@@ -190,6 +190,4 @@ MIT
 
 ## Changelog
 
-### v0.1.0
-
-- Initial release: full rewrite of the Jules MCP integration as a resource-oriented, Zod-validated, MSW-tested server covering all 13 Jules API v1alpha tools.
+See [GitHub Releases](https://github.com/georgeracu/google-jules-mcp-server/releases) — every published version gets an auto-generated release with notes grouped by change type.

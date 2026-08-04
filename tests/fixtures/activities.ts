@@ -99,6 +99,13 @@ export const activityNoVariantFixture = {
   originator: "agent",
 };
 
+export const activityDescriptionOnlyFixture = {
+  name: "sessions/1234567890/activities/a10",
+  createTime: "2026-08-02T13:15:00.000000Z",
+  originator: "agent",
+  description: "Cloned repository and installed dependencies.",
+};
+
 export const activityListFixture = {
   activities: [
     activityPlanGeneratedFixture,
