@@ -34,12 +34,16 @@
     "model-context-protocol",
     "google"
   ],
-  "author": "",
+  "author": "George Racu",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/georgeracu/google-jules-mcp-server.git"
+    "url": "git+https://github.com/georgeracu/google-jules-mcp-server.git"
   },
+  "bugs": {
+    "url": "https://github.com/georgeracu/google-jules-mcp-server/issues"
+  },
+  "homepage": "https://github.com/georgeracu/google-jules-mcp-server#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "undici": "^7.29.0",

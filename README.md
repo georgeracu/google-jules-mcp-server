@@ -36,7 +36,19 @@ Each resource module owns its own [Zod](https://zod.dev) schemas, a typed API cl
 
 ## Quick Start
 
-### 1. Install and build
+### 1. Install
+
+The package is published on npm as [`google-jules-mcp-server`](https://www.npmjs.com/package/google-jules-mcp-server). Most MCP clients can run it directly via `npx` — no separate install step needed, skip to step 2.
+
+If you'd rather install it once instead of letting your client invoke `npx` on every launch:
+
+```bash
+npm install -g google-jules-mcp-server
+```
+
+This puts a `google-jules-mcp` binary on your `PATH`.
+
+**Building from source** (for contributors, or to run unreleased changes):
 
 ```bash
 git clone https://github.com/georgeracu/google-jules-mcp-server.git
@@ -47,12 +59,14 @@ npm run build
 
 ### 2. Configure your API key
 
+Get a key from https://jules.google.com/settings#api. Set it directly in your MCP client's server config (see below) — that's the only place it needs to live for normal use.
+
+If you're building from source and want to run `npm run test:smoke` or use `.env` for local scripts:
+
 ```bash
 cp .env.example .env
 # edit .env and set JULES_API_KEY
 ```
-
-For MCP clients, prefer setting the key directly in the client's server config (see below) over relying on `.env`.
 
 ### 3. Register the server with your MCP client
 
@@ -62,8 +76,8 @@ For MCP clients, prefer setting the key directly in the client's server config (
 {
   "mcpServers": {
     "jules": {
-      "command": "node",
-      "args": ["/absolute/path/to/google-jules-mcp-server/build/index.js"],
+      "command": "npx",
+      "args": ["-y", "google-jules-mcp-server"],
       "env": { "JULES_API_KEY": "your_actual_jules_api_key_here" }
     }
   }
@@ -73,10 +87,14 @@ For MCP clients, prefer setting the key directly in the client's server config (
 **Claude Code**:
 
 ```bash
-claude mcp add jules -s user -e JULES_API_KEY=your_actual_jules_api_key_here -- node /absolute/path/to/google-jules-mcp-server/build/index.js
+claude mcp add jules -s user -e JULES_API_KEY=your_actual_jules_api_key_here -- npx -y google-jules-mcp-server
 ```
 
-Use an absolute path to `build/index.js` in either case, and restart the client after editing its config.
+If you installed globally instead, replace `"command": "npx", "args": ["-y", "google-jules-mcp-server"]` with `"command": "google-jules-mcp", "args": []` (and the `npx -y google-jules-mcp-server` in the Claude Code command with just `google-jules-mcp`).
+
+If you're running from a local clone instead, use `"command": "node", "args": ["/absolute/path/to/google-jules-mcp-server/build/index.js"]` (an absolute path to `build/index.js`).
+
+Restart your client after editing its config.
 
 ### 4. Verify
 
