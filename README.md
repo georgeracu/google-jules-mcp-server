@@ -137,6 +137,8 @@ Jules enforces task quotas based on subscription tier (Free: 15 daily / 3 concur
 
 ## Development
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full setup and PR checklist, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community standards.
+
 ```bash
 npm run dev              # tsc --watch
 npm run lint              # eslint
@@ -171,6 +173,10 @@ JULES_LIVE_SMOKE_TEST=1 npm run test:smoke
 - **"JULES_API_KEY environment variable is required"**: the key isn't set in your client's server config `env` block.
 - **"No repositories connected to Jules"**: visit https://jules.google.com, connect your GitHub account, and grant repository access.
 - **401 / 403 / 404**: 401 means an invalid API key (regenerate at the settings link above), 403 means insufficient permissions or exceeded quota, 404 means the session or repository ID doesn't exist.
+
+## Security
+
+Found a vulnerability? See [SECURITY.md](SECURITY.md) for how to report it privately.
 
 ## API Reference
 
