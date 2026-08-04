@@ -21,6 +21,10 @@ jobs:
           cache: npm
           registry-url: "https://registry.npmjs.org"
 
+      # Trusted publishing (OIDC) needs npm CLI >=11.5.1; setup-node's bundled
+      # npm can lag behind that.
+      - run: npm install -g npm@latest
+
       - run: npm ci
 
       - name: Verify tag matches package.json version
@@ -32,6 +36,4 @@ jobs:
             exit 1
           fi
 
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm publish --access public

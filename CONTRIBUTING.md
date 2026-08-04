@@ -51,4 +51,4 @@ npm version patch   # or minor / major — bumps package.json and creates the ta
 git push --follow-tags
 ```
 
-The workflow re-runs lint/typecheck/tests/build (via `prepublishOnly`) and refuses to publish if the tag doesn't match `package.json`'s version, then runs `npm publish --provenance`. Requires the `NPM_TOKEN` repo secret (an npm Automation or Granular Access Token with publish rights) to be set.
+The workflow re-runs lint/typecheck/tests/build (via `prepublishOnly`) and refuses to publish if the tag doesn't match `package.json`'s version, then runs `npm publish`. Authentication is via npm's [Trusted Publisher](https://docs.npmjs.com/trusted-publishers) (OIDC) — no stored npm token, and provenance attestation is generated automatically. This requires a one-time setup on npmjs.com: package Settings → Trusted Publisher → GitHub Actions, with organization/user `georgeracu`, repository `google-jules-mcp-server`, workflow filename `release.yml`, no environment.
