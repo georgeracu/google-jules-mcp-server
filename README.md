@@ -195,6 +195,20 @@ Ask your assistant: "List my Jules repositories." You should see the `jules` ser
 | `jules_list_activities`    | Get a session's detailed activity log                                   |
 | `jules_get_activity`       | Get a single activity by ID                                             |
 
+## Output Size and Pagination
+
+Everything these tools return lands in your assistant's context window, and an autonomous coding session can produce very long agent messages, progress descriptions and plans of hundreds of steps. The server therefore caps what it hands back, and says so in-band whenever it cuts something, so the assistant can decide whether to go and fetch the rest.
+
+| Tool                    | Cap                                                       |
+| ----------------------- | --------------------------------------------------------- |
+| `jules_get_status`      | 100 characters per activity in the recent-activity digest |
+| `jules_list_activities` | ~800 characters per entry, ~10,000 characters per page    |
+| `jules_get_activity`    | 8,000 characters                                          |
+
+A capped entry in `jules_list_activities` names the `sessionId` and `activityId` needed to retrieve it in full through `jules_get_activity`, which applies the much larger single-activity cap. If whole entries had to be dropped to stay inside the page budget, the response ends with `Showing 12 of 40 activities`; the fix there is a smaller `limit`, not the page token, since the token resumes after the entire requested page and would skip the entries you didn't see.
+
+Pagination itself is unaffected by any of this. `jules_list_sources`, `jules_list_sessions` and `jules_list_activities` all accept `pageSize` (or `limit`) and `pageToken`, and echo the API's `nextPageToken` back when more results exist.
+
 ## Async Workflow Pattern
 
 1. **Create** a session — returns immediately with a session ID.
