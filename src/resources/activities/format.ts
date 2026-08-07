@@ -1,12 +1,16 @@
 import type { Activity, ActivityList } from "./schemas.js";
 
-const SUMMARY_TRUNCATE_LENGTH = 100;
+const SUMMARY_CHAR_BUDGET = 100;
+const LIST_ITEM_CHAR_BUDGET = 800;
+const LIST_PAGE_CHAR_BUDGET = 10_000;
+const DETAIL_CHAR_BUDGET = 8_000;
+/** Below this the recovery hint costs more than the cut saves, so leave the item whole. */
+const LIST_ITEM_SLACK = 150;
 const UNKNOWN_ACTIVITY_TEXT = "Activity occurred";
 
-function truncate(text: string): string {
-  return text.length > SUMMARY_TRUNCATE_LENGTH
-    ? `${text.slice(0, SUMMARY_TRUNCATE_LENGTH)}...`
-    : text;
+function activityRef(activity: Activity): string {
+  const segments = activity.name.split("/");
+  return activity.id ?? segments[segments.length - 1];
 }
 
 function formatArtifactBullet(artifact: NonNullable<Activity["artifacts"]>[number]): string {
@@ -39,15 +43,14 @@ function formatArtifactBullets(
   return artifacts.map((a) => `${indent}${formatArtifactBullet(a)}\n`).join("");
 }
 
-/** Single-line variant summary used in jules_get_status's recent-activity digest. */
-export function formatActivitySummary(activity: Activity): string {
+function summaryText(activity: Activity): string {
   if (activity.planGenerated) {
     const steps = activity.planGenerated.plan?.steps?.length ?? 0;
     return `Generated execution plan with ${steps} steps`;
   }
   if (activity.planApproved) return "Plan approved";
-  if (activity.agentMessaged) return `Message: ${truncate(activity.agentMessaged.agentMessage)}`;
-  if (activity.userMessaged) return `Received: ${truncate(activity.userMessaged.userMessage)}`;
+  if (activity.agentMessaged) return `Message: ${activity.agentMessaged.agentMessage}`;
+  if (activity.userMessaged) return `Received: ${activity.userMessaged.userMessage}`;
   if (activity.progressUpdated) {
     return `Progress update${activity.progressUpdated.title ? `: ${activity.progressUpdated.title}` : ""}`;
   }
@@ -58,8 +61,17 @@ export function formatActivitySummary(activity: Activity): string {
   return activity.description ?? UNKNOWN_ACTIVITY_TEXT;
 }
 
-/** Full multi-line rendering of one activity, used standalone by jules_get_activity. */
-export function formatActivityDetail(activity: Activity): string {
+/**
+ * Single-line variant summary used in jules_get_status's recent-activity digest.
+ * jules_get_status renders one of these per activity with no budget of its own,
+ * so the cap applies to the whole line rather than to individual fields.
+ */
+export function formatActivitySummary(activity: Activity): string {
+  const text = summaryText(activity);
+  return text.length > SUMMARY_CHAR_BUDGET ? `${text.slice(0, SUMMARY_CHAR_BUDGET)}...` : text;
+}
+
+function detailText(activity: Activity): string {
   const header = `[${activity.originator ?? "unknown"}] ${activity.createTime ?? "no timestamp"}\n\n`;
 
   if (activity.planGenerated) {
@@ -92,7 +104,27 @@ export function formatActivityDetail(activity: Activity): string {
   return `${header}${activity.description ?? UNKNOWN_ACTIVITY_TEXT}`;
 }
 
-function formatActivityListItem(activity: Activity, index: number): string {
+/**
+ * Full multi-line rendering of one activity, used standalone by jules_get_activity.
+ * This is the escape hatch the list path points at, so it gets the largest budget —
+ * capped all the same, since a plan can carry hundreds of steps. There is nothing
+ * past this cap to page to, so a cut here says so outright: without that, an
+ * assistant sent here by the list hint would keep re-requesting an activity whose
+ * remainder no tool can return.
+ */
+export function formatActivityDetail(activity: Activity): string {
+  const text = detailText(activity);
+  if (text.length <= DETAIL_CHAR_BUDGET) return text;
+
+  const omitted = text.length - DETAIL_CHAR_BUDGET;
+  return (
+    `${text.slice(0, DETAIL_CHAR_BUDGET)}...\n` +
+    `[+${omitted} chars omitted - this is the largest rendering available and no tool ` +
+    `returns the remainder, so re-requesting this activity will not recover it]\n`
+  );
+}
+
+function listItemText(activity: Activity, index: number): string {
   const originator = activity.originator ?? "unknown";
   const createTime = activity.createTime ?? "no timestamp";
   let body = `${index + 1}. [${originator}] ${createTime}\n`;
@@ -131,14 +163,48 @@ function formatActivityListItem(activity: Activity, index: number): string {
   return body;
 }
 
+/**
+ * Caps one rendered entry rather than each field inside it, which bounds every
+ * field transitively — including collections like plan steps, where a per-field
+ * cap leaves the count unbounded. The hint is in-band and actionable: it names
+ * the arguments jules_get_activity needs to return this entry under its own,
+ * much larger budget.
+ */
+function formatActivityListItem(activity: Activity, index: number, sessionId: string): string {
+  const body = listItemText(activity, index);
+  if (body.length <= LIST_ITEM_CHAR_BUDGET + LIST_ITEM_SLACK) return body;
+
+  const omitted = body.length - LIST_ITEM_CHAR_BUDGET;
+  return (
+    `${body.slice(0, LIST_ITEM_CHAR_BUDGET)}...\n` +
+    `   [+${omitted} chars - use jules_get_activity with sessionId "${sessionId}" ` +
+    `and activityId "${activityRef(activity)}" for the expanded entry]\n`
+  );
+}
+
 export function formatActivityList(data: ActivityList, sessionId: string): string {
   if (!data.activities || data.activities.length === 0) {
     return "No activities found for this session. The session may be just starting.";
   }
 
-  let text = `Activities for session ${sessionId} (${data.activities.length}):\n\n`;
-  text += data.activities.map((activity, i) => `${formatActivityListItem(activity, i)}\n`).join("");
+  const total = data.activities.length;
+  const items: string[] = [];
+  let used = 0;
+  for (const [index, activity] of data.activities.entries()) {
+    const item = `${formatActivityListItem(activity, index, sessionId)}\n`;
+    if (used + item.length > LIST_PAGE_CHAR_BUDGET) break;
+    items.push(item);
+    used += item.length;
+  }
 
+  let text = `Activities for session ${sessionId} (${total}):\n\n`;
+  text += items.join("");
+
+  if (items.length < total) {
+    text +=
+      `Showing ${items.length} of ${total} activities - output capped. ` +
+      `Re-run with a smaller limit to see the rest; pageToken skips past all ${total}.\n`;
+  }
   if (data.nextPageToken) {
     text += `More activities available. Use pageToken: ${data.nextPageToken}\n`;
   }
