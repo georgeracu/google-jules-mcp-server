@@ -8,10 +8,6 @@ const DETAIL_CHAR_BUDGET = 8_000;
 const LIST_ITEM_SLACK = 150;
 const UNKNOWN_ACTIVITY_TEXT = "Activity occurred";
 
-function truncate(text: string, limit: number): string {
-  return text.length > limit ? `${text.slice(0, limit)}...` : text;
-}
-
 function activityRef(activity: Activity): string {
   const segments = activity.name.split("/");
   return activity.id ?? segments[segments.length - 1];
@@ -71,7 +67,8 @@ function summaryText(activity: Activity): string {
  * so the cap applies to the whole line rather than to individual fields.
  */
 export function formatActivitySummary(activity: Activity): string {
-  return truncate(summaryText(activity), SUMMARY_CHAR_BUDGET);
+  const text = summaryText(activity);
+  return text.length > SUMMARY_CHAR_BUDGET ? `${text.slice(0, SUMMARY_CHAR_BUDGET)}...` : text;
 }
 
 function detailText(activity: Activity): string {
@@ -110,10 +107,21 @@ function detailText(activity: Activity): string {
 /**
  * Full multi-line rendering of one activity, used standalone by jules_get_activity.
  * This is the escape hatch the list path points at, so it gets the largest budget —
- * capped all the same, since a plan can carry hundreds of steps.
+ * capped all the same, since a plan can carry hundreds of steps. There is nothing
+ * past this cap to page to, so a cut here says so outright: without that, an
+ * assistant sent here by the list hint would keep re-requesting an activity whose
+ * remainder no tool can return.
  */
 export function formatActivityDetail(activity: Activity): string {
-  return truncate(detailText(activity), DETAIL_CHAR_BUDGET);
+  const text = detailText(activity);
+  if (text.length <= DETAIL_CHAR_BUDGET) return text;
+
+  const omitted = text.length - DETAIL_CHAR_BUDGET;
+  return (
+    `${text.slice(0, DETAIL_CHAR_BUDGET)}...\n` +
+    `[+${omitted} chars omitted - this is the largest rendering available and no tool ` +
+    `returns the remainder, so re-requesting this activity will not recover it]\n`
+  );
 }
 
 function listItemText(activity: Activity, index: number): string {
@@ -170,7 +178,7 @@ function formatActivityListItem(activity: Activity, index: number, sessionId: st
   return (
     `${body.slice(0, LIST_ITEM_CHAR_BUDGET)}...\n` +
     `   [+${omitted} chars - use jules_get_activity with sessionId "${sessionId}" ` +
-    `and activityId "${activityRef(activity)}" for the full entry]\n`
+    `and activityId "${activityRef(activity)}" for the expanded entry]\n`
   );
 }
 

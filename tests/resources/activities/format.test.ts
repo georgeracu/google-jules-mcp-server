@@ -187,7 +187,7 @@ describe("output caps", () => {
   it("caps a long list entry and names both arguments jules_get_activity needs", () => {
     const text = listOne({ agentMessaged: { agentMessage: longText(5000) } });
     expect(text).toContain(
-      'use jules_get_activity with sessionId "sess-1" and activityId "a1" for the full entry'
+      'use jules_get_activity with sessionId "sess-1" and activityId "a1" for the expanded entry'
     );
     expect(text).not.toContain(longText(801));
   });
@@ -244,8 +244,23 @@ describe("output caps", () => {
       name: "sessions/s1/activities/a1",
       planGenerated: { plan: { steps } },
     });
-    expect(text.length).toBeLessThanOrEqual(8003);
-    expect(text.endsWith("...")).toBe(true);
+    expect(text.length).toBeLessThan(8250);
+    expect(text).toContain("chars omitted");
+  });
+
+  it("tells the caller a capped detail response is terminal, not a page to follow", () => {
+    const text = formatActivityDetail({
+      name: "sessions/s1/activities/a1",
+      agentMessaged: { agentMessage: longText(20_000) },
+    });
+    expect(text).toContain("this is the largest rendering available");
+    expect(text).toContain("re-requesting this activity will not recover it");
+    expect(text).not.toContain("jules_get_activity");
+  });
+
+  it("never promises the full entry from a path that cannot deliver it", () => {
+    const capped = listOne({ agentMessaged: { agentMessage: longText(5000) } });
+    expect(capped).not.toContain("full entry");
   });
 
   it("leaves detail text just under the cap untouched", () => {
