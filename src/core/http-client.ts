@@ -1,15 +1,34 @@
-import { EnvHttpProxyAgent } from "undici";
+import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 import type { z } from "zod";
 
 import { JULES_API_BASE } from "./config.js";
 import { JulesNetworkError, JulesResponseValidationError, mapResponseToError } from "./errors.js";
 import { DEFAULT_RETRY_POLICY, retryWithBackoff, type RetryPolicy } from "./retry.js";
 
+const PROXY_ENV_VARS = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"];
+
 /**
  * Honours HTTP_PROXY/HTTPS_PROXY/NO_PROXY, as set by enterprise proxies, without
- * any config on our side — falls through to a direct connection when unset.
+ * any config on our side.
+ *
+ * Both halves are picked together and neither travels alone. Node's global fetch
+ * runs on its own bundled undici, so handing it a dispatcher built from this
+ * separate copy drops every response header once that dispatcher tunnels through
+ * a proxy: content-encoding vanishes and gzipped bodies reach JSON.parse as raw
+ * bytes, and retry-after vanishes with it. undici's own fetch keeps them. With no
+ * proxy configured there is nothing for the dispatcher to do, so we leave the
+ * platform's fetch alone rather than route around it for no gain.
  */
-const proxyDispatcher: NonNullable<RequestInit["dispatcher"]> = new EnvHttpProxyAgent();
+const proxyDispatcher: NonNullable<RequestInit["dispatcher"]> | undefined = PROXY_ENV_VARS.some(
+  (name) => process.env[name]
+)
+  ? new EnvHttpProxyAgent()
+  : undefined;
+
+/** Read per request rather than captured: globalThis.fetch is what mocks replace. */
+function currentFetch(): typeof globalThis.fetch {
+  return proxyDispatcher ? (undiciFetch as unknown as typeof globalThis.fetch) : globalThis.fetch;
+}
 
 /**
  * The only path from a raw fetch response to a typed value: every resource
@@ -49,7 +68,7 @@ export class JulesHttpClient {
     const url = `${this.baseUrl}${path}`;
     let response: Response;
     try {
-      response = await fetch(url, {
+      response = await currentFetch()(url, {
         ...init,
         dispatcher: proxyDispatcher,
         headers: {
