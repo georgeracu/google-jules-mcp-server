@@ -42,4 +42,20 @@ describe("ActivitiesClient", () => {
     const result = await makeClient().getActivity("1234567890", "a1");
     expect(result).toEqual(activityPlanGeneratedFixture);
   });
+
+  it("encodes an activityId containing path traversal instead of letting it redirect the request", async () => {
+    let capturedPath: string | undefined;
+    server.use(
+      http.get(`${BASE}/sessions/1234567890/activities/*`, ({ request }) => {
+        capturedPath = new URL(request.url).pathname;
+        return HttpResponse.json(activityPlanGeneratedFixture);
+      })
+    );
+
+    await makeClient().getActivity("1234567890", "../../sessions/other-session");
+
+    expect(capturedPath).toBe(
+      "/v1alpha/sessions/1234567890/activities/..%2F..%2Fsessions%2Fother-session"
+    );
+  });
 });
