@@ -14,6 +14,9 @@ export class SourcesClient {
   }
 
   getSource(repoOwner: string, repoName: string): Promise<Source> {
-    return this.http.request(`/sources/github/${repoOwner}/${repoName}`, SourceSchema);
+    return this.http.request(
+      `/sources/github/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}`,
+      SourceSchema
+    );
   }
 }

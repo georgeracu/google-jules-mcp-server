@@ -10,12 +10,15 @@ export class ActivitiesClient {
     params: { pageSize?: number; pageToken?: string }
   ): Promise<ActivityList> {
     return this.http.request(
-      `/sessions/${sessionId}/activities${buildPageQuery(params)}`,
+      `/sessions/${encodeURIComponent(sessionId)}/activities${buildPageQuery(params)}`,
       ActivityListSchema
     );
   }
 
   getActivity(sessionId: string, activityId: string): Promise<Activity> {
-    return this.http.request(`/sessions/${sessionId}/activities/${activityId}`, ActivitySchema);
+    return this.http.request(
+      `/sessions/${encodeURIComponent(sessionId)}/activities/${encodeURIComponent(activityId)}`,
+      ActivitySchema
+    );
   }
 }
