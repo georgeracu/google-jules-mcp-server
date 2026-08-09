@@ -142,12 +142,15 @@ describe("JulesHttpClient", () => {
     );
   });
 
-  describe("proxy dispatcher", () => {
+  describe("proxy transport", () => {
     afterEach(() => {
       vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+      vi.doUnmock("undici");
+      vi.resetModules();
     });
 
-    it("passes a dispatcher to fetch so HTTP_PROXY/HTTPS_PROXY are honored", async () => {
+    it("leaves the platform fetch alone when no proxy is configured", async () => {
       const fetchSpy: typeof fetch = vi
         .fn()
         .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
@@ -159,7 +162,36 @@ describe("JulesHttpClient", () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       const [calledUrl, calledInit] = vi.mocked(fetchSpy).mock.calls[0];
       expect(calledUrl).toBe(`${BASE}/ping`);
-      expect(calledInit?.dispatcher).toBeDefined();
+      expect(calledInit?.dispatcher).toBeUndefined();
+    });
+
+    /**
+     * Pairing matters more than either half: a dispatcher from this undici handed
+     * to the platform's fetch is what silently drops response headers behind a
+     * proxy, so the assertion is that both come from the same module.
+     */
+    it("switches to undici's own fetch, with a dispatcher, when HTTPS_PROXY is set", async () => {
+      vi.stubEnv("HTTPS_PROXY", "http://proxy.internal:8080");
+      const undiciFetch = vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      class StubProxyAgent {}
+      vi.doMock("undici", () => ({ fetch: undiciFetch, EnvHttpProxyAgent: StubProxyAgent }));
+      vi.resetModules();
+
+      const { JulesHttpClient: ProxiedClient } = await import("../../src/core/http-client.js");
+      const platformFetch = vi.fn();
+      vi.stubGlobal("fetch", platformFetch);
+
+      await new ProxiedClient("test-api-key", BASE, FAST_POLICY).request(
+        "/ping",
+        z.object({ ok: z.boolean() })
+      );
+
+      expect(platformFetch).not.toHaveBeenCalled();
+      expect(undiciFetch).toHaveBeenCalledTimes(1);
+      const [, calledInit] = undiciFetch.mock.calls[0] as [string, RequestInit];
+      expect(calledInit.dispatcher).toBeInstanceOf(StubProxyAgent);
     });
   });
 
