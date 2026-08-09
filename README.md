@@ -171,6 +171,26 @@ If you installed globally instead, replace `"command": "npx", "args": ["-y", "go
 
 If you're running from a local clone instead, use `"command": "node", "args": ["/absolute/path/to/google-jules-mcp-server/build/index.js"]` (an absolute path to `build/index.js`).
 
+**Behind a corporate proxy** — the server honours the standard `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` variables, and there is nothing to configure on the server itself. What catches people out is that your MCP client spawns the server as a child process, so a variable exported in `~/.zshrc` never reaches a GUI-launched app. Set it in the same `env` block as your API key:
+
+```json
+{
+  "mcpServers": {
+    "jules": {
+      "command": "npx",
+      "args": ["-y", "google-jules-mcp-server"],
+      "env": {
+        "JULES_API_KEY": "your_actual_jules_api_key_here",
+        "HTTPS_PROXY": "http://proxy.example.com:8080",
+        "NO_PROXY": "localhost,127.0.0.1"
+      }
+    }
+  }
+}
+```
+
+Proxied requests are broken in 0.2.3 and earlier, where every call fails on a gzipped response the client never decoded. If you hit that, upgrade rather than reconfigure.
+
 Restart your client after editing its config.
 
 ### 4. Verify
@@ -262,6 +282,8 @@ JULES_LIVE_SMOKE_TEST=1 npm run test:smoke
 - **"JULES_API_KEY environment variable is required"**: the key isn't set in your client's server config `env` block.
 - **"No repositories connected to Jules"**: visit https://jules.google.com, connect your GitHub account, and grant repository access.
 - **401 / 403 / 404**: 401 means an invalid API key (regenerate at the settings link above), 403 means insufficient permissions or exceeded quota, 404 means the session or repository ID doesn't exist.
+- **Every call fails with `Unexpected token '', "..." is not valid JSON`**: you're behind a proxy on 0.2.3 or earlier, where gzipped responses reached the parser still compressed. Upgrade to the latest release.
+- **`Network error connecting to Jules API: fetch failed`, or calls that hang**: if your network requires a proxy, the server isn't seeing it. Exporting it in your shell isn't enough — your client spawns the server as a child process, so `HTTPS_PROXY` belongs in that server's `env` block. See [Behind a corporate proxy](#3-register-the-server-with-your-mcp-client).
 
 ## Security
 
