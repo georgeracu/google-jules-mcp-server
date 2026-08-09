@@ -53,6 +53,20 @@ describe("SessionsClient", () => {
     expect(await makeClient().getSession("1234567890")).toEqual(sessionCompletedFixture);
   });
 
+  it("encodes a sessionId containing path traversal instead of letting it redirect the request", async () => {
+    let capturedPath: string | undefined;
+    server.use(
+      http.get(`${BASE}/sessions/*`, ({ request }) => {
+        capturedPath = new URL(request.url).pathname;
+        return HttpResponse.json(sessionCompletedFixture);
+      })
+    );
+
+    await makeClient().getSession("../../other-account");
+
+    expect(capturedPath).toBe("/v1alpha/sessions/..%2F..%2Fother-account");
+  });
+
   it("sendMessage POSTs to /sessions/{id}:sendMessage", async () => {
     let capturedPath: string | undefined;
     let capturedBody: unknown;
