@@ -12,6 +12,7 @@ import {
   sessionAwaitingUserFeedbackFixture,
   sessionCompletedFixture,
   sessionCompletedNoPrFixture,
+  sessionCompletedWithMultipleOutputsFixture,
   sessionListFixture,
 } from "../../fixtures/sessions.js";
 
@@ -22,8 +23,8 @@ describe("formatSessionList", () => {
 
   it("numbers sessions and includes PR links when present", () => {
     const text = formatSessionList(sessionListFixture);
-    expect(text).toContain("1. Add unit tests for auth module");
-    expect(text).toContain("PR: https://github.com/acme/widget-app/pull/42");
+    expect(text).toContain("1. Code Review: PR 17 (fix/encode-path-segments)");
+    expect(text).toContain("PR: https://github.com/acme/widget-app/pull/18");
     expect(text).toContain(`pageToken: ${sessionListFixture.nextPageToken}`);
   });
 });
@@ -58,6 +59,12 @@ describe("formatSessionStatus", () => {
     const text = formatSessionStatus(sessionCompletedFixture, {});
     expect(text).toContain("Pull Request Created:");
     expect(text).toContain("https://github.com/acme/widget-app/pull/42");
+  });
+
+  it("finds and includes pull request details when PR is at a non-zero index", () => {
+    const text = formatSessionStatus(sessionCompletedWithMultipleOutputsFixture, {});
+    expect(text).toContain("Pull Request Created:");
+    expect(text).toContain("https://github.com/acme/widget-app/pull/18");
   });
 
   it("reports no activities yet when the activity list is empty", () => {
@@ -115,5 +122,12 @@ describe("formatSessionOutput", () => {
     expect(text).toContain("Pull Request:");
     expect(text).toContain("Number: #42");
     expect(text).toContain("Adds coverage for login/logout/token refresh.");
+  });
+
+  it("finds and renders full pull request details when PR is at a non-zero index", () => {
+    const text = formatSessionOutput(sessionCompletedWithMultipleOutputsFixture);
+    expect(text).toContain("Pull Request:");
+    expect(text).toContain("Number: #18");
+    expect(text).toContain("Review comments and fixes.");
   });
 });

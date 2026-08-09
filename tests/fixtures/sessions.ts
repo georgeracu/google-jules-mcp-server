@@ -48,7 +48,34 @@ export const sessionAwaitingUserFeedbackFixture = {
   state: "AWAITING_USER_FEEDBACK",
 } satisfies Session;
 
+export const sessionCompletedWithMultipleOutputsFixture = {
+  name: "sessions/18290074838581230171",
+  id: "18290074838581230171",
+  title: "Code Review: PR 17 (fix/encode-path-segments)",
+  prompt: "Do a code review for branch fix/encode-path-segments that's on PR 17",
+  state: "COMPLETED",
+  sourceContext: {
+    source: "sources/github/acme/widget-app",
+    githubRepoContext: { startingBranch: "main" },
+  },
+  createTime: "2026-08-02T13:00:02.155722147Z",
+  updateTime: "2026-08-02T13:45:38.626149Z",
+  archived: false,
+  url: "https://jules.google.com/session/18290074838581230171",
+  outputs: [
+    {}, // Represents a non-PR output like changeSet which currently parses to empty object due to SessionOutputSchema
+    {
+      pullRequest: {
+        url: "https://github.com/acme/widget-app/pull/18",
+        title: "Code Review: PR 17 (fix/encode-path-segments)",
+        description: "Review comments and fixes.",
+        number: 18,
+      },
+    },
+  ],
+} satisfies Session;
+
 export const sessionListFixture = {
-  sessions: [sessionCompletedFixture, sessionAwaitingPlanApprovalFixture],
+  sessions: [sessionCompletedWithMultipleOutputsFixture, sessionAwaitingPlanApprovalFixture],
   nextPageToken: "session-page-2",
 } satisfies SessionList;
