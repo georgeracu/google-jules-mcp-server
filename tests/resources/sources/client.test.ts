@@ -57,4 +57,18 @@ describe("SourcesClient", () => {
     expect(result).toEqual(sourceFixture);
     expect(capturedPath).toBe("/v1alpha/sources/github/acme/widget-app");
   });
+
+  it("encodes a repoName containing path traversal instead of letting it redirect the request", async () => {
+    let capturedPath: string | undefined;
+    server.use(
+      http.get(`${BASE}/sources/github/acme/*`, ({ request }) => {
+        capturedPath = new URL(request.url).pathname;
+        return HttpResponse.json(sourceFixture);
+      })
+    );
+
+    await makeClient().getSource("acme", "../../other-owner/other-repo");
+
+    expect(capturedPath).toBe("/v1alpha/sources/github/acme/..%2F..%2Fother-owner%2Fother-repo");
+  });
 });
