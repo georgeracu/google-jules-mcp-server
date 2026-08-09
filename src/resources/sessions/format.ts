@@ -9,7 +9,7 @@ export function formatSessionList(data: SessionList): string {
 
   const sessionsList = data.sessions
     .map((session, index) => {
-      const prUrl = session.outputs?.[0]?.pullRequest?.url;
+      const prUrl = session.outputs?.find((o) => o.pullRequest)?.pullRequest?.url;
       const prInfo = prUrl ? `\n  PR: ${prUrl}` : "";
       return (
         `${index + 1}. ${session.title ?? "Untitled"}\n` +
@@ -78,7 +78,7 @@ function formatStateGuidance(session: Session): string {
 export function formatSessionStatus(session: Session, activities: ActivityList): string {
   let statusText = `Session: ${session.title ?? "Untitled"}\nState: ${session.state}\nPrompt: ${session.prompt}\n\n`;
 
-  const pr = session.outputs?.[0]?.pullRequest;
+  const pr = session.outputs?.find((o) => o.pullRequest)?.pullRequest;
   if (pr) {
     statusText += "Pull Request Created:\n";
     statusText += `  URL: ${pr.url}\n`;
@@ -109,7 +109,7 @@ export function formatSessionOutput(session: Session): string {
     );
   }
 
-  const pr = session.outputs?.[0]?.pullRequest;
+  const pr = session.outputs?.find((o) => o.pullRequest)?.pullRequest;
   if (!pr) {
     return (
       "Session completed but no pull request was created.\n\n" +
