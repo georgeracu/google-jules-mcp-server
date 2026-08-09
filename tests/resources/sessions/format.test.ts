@@ -23,7 +23,8 @@ describe("formatSessionList", () => {
 
   it("numbers sessions and includes PR links when present", () => {
     const text = formatSessionList(sessionListFixture);
-    expect(text).toContain("1. Code Review: PR 17 (fix/encode-path-segments)");
+    expect(text).toContain("1. Add unit tests for auth module");
+    expect(text).toContain("PR: https://github.com/acme/widget-app/pull/42");
     expect(text).toContain("PR: https://github.com/acme/widget-app/pull/18");
     expect(text).toContain(`pageToken: ${sessionListFixture.nextPageToken}`);
   });

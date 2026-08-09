@@ -76,6 +76,10 @@ export const sessionCompletedWithMultipleOutputsFixture = {
 } satisfies Session;
 
 export const sessionListFixture = {
-  sessions: [sessionCompletedWithMultipleOutputsFixture, sessionAwaitingPlanApprovalFixture],
+  sessions: [
+    sessionCompletedFixture,
+    sessionCompletedWithMultipleOutputsFixture,
+    sessionAwaitingPlanApprovalFixture,
+  ],
   nextPageToken: "session-page-2",
 } satisfies SessionList;
