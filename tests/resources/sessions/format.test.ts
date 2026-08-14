@@ -133,6 +133,56 @@ describe("formatSessionOutput", () => {
     expect(text).toContain("Number: #18");
     expect(text).toContain("Review comments and fixes.");
   });
+
+  it("renders code change details when only changeSet is present in outputs", () => {
+    const sessionWithChangeSet = {
+      id: "7777777777",
+      title: "Jules Code Review",
+      prompt: "Review the code change",
+      state: "COMPLETED" as const,
+      outputs: [
+        {
+          changeSet: {
+            source: "sources/github/acme/widget-app",
+            gitPatch: {
+              suggestedCommitMessage: "Fix path segmentation",
+              unidiffPatch: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1,3 +1,3 @@\n-old\n+new",
+            },
+          },
+        },
+      ],
+    };
+    const text = formatSessionOutput(sessionWithChangeSet);
+    expect(text).toContain("Code Change:");
+    expect(text).toContain("Source: sources/github/acme/widget-app");
+    expect(text).toContain("Suggested commit message: Fix path segmentation");
+    expect(text).toContain("Touched files:\n    - foo");
+    expect(text).toContain("Diff:\n    diff --git a/foo b/foo");
+  });
+
+  it("truncates the diff when it exceeds the character budget", () => {
+    const sessionWithHugeDiff = {
+      id: "8888888888",
+      title: "Jules Large Patch",
+      prompt: "Generate a large patch",
+      state: "COMPLETED" as const,
+      outputs: [
+        {
+          changeSet: {
+            source: "sources/github/acme/widget-app",
+            gitPatch: {
+              suggestedCommitMessage: "Fix lots of things",
+              unidiffPatch: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n" + "x".repeat(3000),
+            },
+          },
+        },
+      ],
+    };
+    const text = formatSessionOutput(sessionWithHugeDiff);
+    expect(text).toContain("Code Change:");
+    expect(text).toContain("chars omitted");
+    expect(text).toContain("re-requesting this activity will not recover it");
+  });
 });
 
 describe("formatWaitResolution and formatWaitTimeout", () => {

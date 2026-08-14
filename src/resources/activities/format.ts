@@ -1,5 +1,72 @@
 import type { Activity, ActivityList } from "./schemas.js";
 
+export function getTouchedFiles(patch: string): string[] {
+  const files = new Set<string>();
+  const lines = patch.split("\n");
+  for (const line of lines) {
+    if (line.startsWith("diff --git ")) {
+      const match = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
+      if (match) {
+        files.add(match[1]);
+        files.add(match[2]);
+      }
+    } else if (line.startsWith("--- a/") || line.startsWith("+++ b/")) {
+      const file = line.slice(6).split("\t")[0].trim();
+      if (file && file !== "/dev/null") {
+        files.add(file);
+      }
+    } else if (line.startsWith("--- ") || line.startsWith("+++ ")) {
+      const content = line.slice(4).split("\t")[0].trim();
+      if (content && content !== "/dev/null") {
+        const cleaned = content.replace(/^[ab]\//, "");
+        files.add(cleaned);
+      }
+    }
+  }
+  return Array.from(files);
+}
+
+export function formatChangeSet(
+  changeSet: NonNullable<NonNullable<Activity["artifacts"]>[number]["changeSet"]>,
+  indent = ""
+): string {
+  let res = "";
+  if (changeSet.source) {
+    res += `${indent}Source: ${changeSet.source}\n`;
+  }
+  const patch = changeSet.gitPatch;
+  if (patch) {
+    if (patch.suggestedCommitMessage) {
+      res += `${indent}Suggested commit message: ${patch.suggestedCommitMessage}\n`;
+    }
+    const touchedFiles = patch.unidiffPatch ? getTouchedFiles(patch.unidiffPatch) : [];
+    if (touchedFiles.length > 0) {
+      res += `${indent}Touched files:\n`;
+      for (const file of touchedFiles) {
+        res += `${indent}  - ${file}\n`;
+      }
+    }
+    if (patch.unidiffPatch) {
+      res += `${indent}Diff:\n`;
+      const budget = 2000;
+      let diffText = patch.unidiffPatch;
+      if (diffText.length > budget) {
+        const omitted = diffText.length - budget;
+        diffText =
+          diffText.slice(0, budget) +
+          `...\n[+${omitted} chars omitted - this is the largest rendering available and no tool ` +
+          `returns the remainder, so re-requesting this activity will not recover it]`;
+      }
+      const indentedDiff = diffText
+        .split("\n")
+        .map((line) => (line ? `${indent}  ${line}` : ""))
+        .join("\n");
+      res += indentedDiff + "\n";
+    }
+  }
+  return res;
+}
+
 const SUMMARY_CHAR_BUDGET = 100;
 const LIST_ITEM_CHAR_BUDGET = 800;
 const LIST_PAGE_CHAR_BUDGET = 10_000;
@@ -13,9 +80,14 @@ function activityRef(activity: Activity): string {
   return activity.id ?? segments[segments.length - 1];
 }
 
-function formatArtifactBullet(artifact: NonNullable<Activity["artifacts"]>[number]): string {
-  if (artifact.changeSet)
-    return `- Code change on ${artifact.changeSet.source ?? "unknown source"}`;
+function formatArtifactBullet(
+  artifact: NonNullable<Activity["artifacts"]>[number],
+  indent = ""
+): string {
+  if (artifact.changeSet) {
+    const formatted = formatChangeSet(artifact.changeSet, indent + "  ");
+    return `- Code change on ${artifact.changeSet.source ?? "unknown source"}:\n${formatted.trimEnd()}`;
+  }
   if (artifact.bashOutput) return `- Bash: ${artifact.bashOutput.command ?? "unknown command"}`;
   if (artifact.media) return `- Media (${artifact.media.mimeType ?? "unknown type"})`;
   return "- Unknown artifact";
@@ -40,7 +112,7 @@ function formatArtifactBullets(
   artifacts: NonNullable<Activity["artifacts"]>,
   indent: string
 ): string {
-  return artifacts.map((a) => `${indent}${formatArtifactBullet(a)}\n`).join("");
+  return artifacts.map((a) => `${indent}${formatArtifactBullet(a, indent)}\n`).join("");
 }
 
 function summaryText(activity: Activity): string {

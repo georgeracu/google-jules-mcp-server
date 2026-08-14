@@ -71,6 +71,24 @@ describe("formatActivityDetail", () => {
     expect(text).toContain("Media (image/png)");
   });
 
+  it("renders ChangeSet details in artifact detail view", () => {
+    const text = formatActivityDetail(activityArtifactsFixture);
+    expect(text).toContain("Code change on sources/github/acme/widget-app:");
+    expect(text).toContain("Source: sources/github/acme/widget-app");
+    expect(text).toContain("Suggested commit message: Add auth tests");
+    expect(text).toContain("Touched files:\n    - foo");
+    expect(text).toContain("Diff:\n    diff --git a/foo b/foo");
+  });
+
+  it("renders ChangeSet details inside activity list item with correct indentation", () => {
+    const text = formatActivityList({ activities: [activityArtifactsFixture] }, "sess-123");
+    expect(text).toContain("   - Code change on sources/github/acme/widget-app:");
+    expect(text).toContain("     Source: sources/github/acme/widget-app");
+    expect(text).toContain("     Suggested commit message: Add auth tests");
+    expect(text).toContain("     Touched files:\n       - foo");
+    expect(text).toContain("     Diff:\n       diff --git a/foo b/foo");
+  });
+
   it("falls back to 'Activity occurred' when no variant is present", () => {
     expect(formatActivityDetail(activityNoVariantFixture)).toContain("Activity occurred");
   });

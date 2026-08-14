@@ -63,7 +63,16 @@ export const sessionCompletedWithMultipleOutputsFixture = {
   archived: false,
   url: "https://jules.google.com/session/18290074838581230171",
   outputs: [
-    {}, // Represents a non-PR output like changeSet which currently parses to empty object due to SessionOutputSchema
+    {
+      changeSet: {
+        source: "sources/github/acme/widget-app",
+        gitPatch: {
+          baseCommitId: "abc123",
+          suggestedCommitMessage: "Code Review: PR 17 (fix/encode-path-segments)",
+          unidiffPatch: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1,3 +1,3 @@\n-old line\n+new line",
+        },
+      },
+    },
     {
       pullRequest: {
         url: "https://github.com/acme/widget-app/pull/18",

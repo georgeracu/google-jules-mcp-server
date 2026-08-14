@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ChangeSetSchema } from "../activities/schemas.js";
 
 export const SessionStateSchema = z.enum([
   "STATE_UNSPECIFIED",
@@ -33,6 +34,7 @@ export type PullRequest = z.infer<typeof PullRequestSchema>;
 
 export const SessionOutputSchema = z.object({
   pullRequest: PullRequestSchema.optional(),
+  changeSet: ChangeSetSchema.optional(),
 });
 
 export const SessionSchema = z.object({
