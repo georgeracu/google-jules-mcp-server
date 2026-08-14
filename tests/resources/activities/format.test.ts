@@ -4,6 +4,7 @@ import {
   formatActivityDetail,
   formatActivityList,
   formatActivitySummary,
+  getTouchedFiles,
 } from "../../../src/resources/activities/format.js";
 import {
   activityAgentMessagedFixture,
@@ -317,5 +318,11 @@ describe("output caps", () => {
     const text = formatActivityList(activityListFixture, "sess-1");
     expect(text).not.toContain("Showing");
     expect(text).not.toContain("use jules_get_activity");
+  });
+
+  it("parses touched files with non-standard prefix", () => {
+    const files = getTouchedFiles("--- foo.ts\n+++ bar.ts\n");
+    expect(files).toContain("foo.ts");
+    expect(files).toContain("bar.ts");
   });
 });
