@@ -101,10 +101,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
       }
 
       const remainingMs = maxWaitMs - (Date.now() - start);
-      const sleepMs = Math.min(pollIntervalMs, remainingMs);
-      if (sleepMs <= 0) {
-        continue;
-      }
+      const sleepMs = Math.max(0, Math.min(pollIntervalMs, remainingMs));
       await new Promise((resolve) => setTimeout(resolve, sleepMs));
     }
   };

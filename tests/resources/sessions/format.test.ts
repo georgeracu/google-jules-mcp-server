@@ -145,6 +145,24 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
     expect(text).toContain("Recent Activities (7):");
   });
 
+  it("formats completed state with PR without a number and with empty activities", () => {
+    const sessionWithNoPrNumber = {
+      ...sessionCompletedFixture,
+      outputs: [
+        {
+          pullRequest: {
+            url: "https://github.com/acme/widget-app/pull/42",
+            title: "Add auth module unit tests",
+          },
+        },
+      ],
+    };
+    const text = formatWaitResolution(sessionWithNoPrNumber, {});
+    expect(text).toContain("Session Wait Resolved!");
+    expect(text).not.toContain("Number:");
+    expect(text).not.toContain("Recent Activities");
+  });
+
   it("formats failed state with reason", () => {
     const failedActivities = {
       activities: [
@@ -162,6 +180,16 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
     expect(text).toContain("Session failed. Reason: Cloud VM out of memory");
   });
 
+  it("formats failed state with empty activities and empty outputs", () => {
+    const text = formatWaitResolution(
+      { ...sessionCompletedFixture, outputs: [], state: "FAILED" as const },
+      {}
+    );
+    expect(text).toContain("Final State: FAILED");
+    expect(text).not.toContain("Pull Request");
+    expect(text).not.toContain("Recent Activities");
+  });
+
   it("formats other states like awaiting approval, user feedback, paused, default", () => {
     const states = ["AWAITING_PLAN_APPROVAL", "AWAITING_USER_FEEDBACK", "PAUSED", "QUEUED"] as const;
     for (const state of states) {
@@ -173,10 +201,17 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
     }
   });
 
-  it("formats timeout details", () => {
+  it("formats timeout details with activities", () => {
     const text = formatWaitTimeout(sessionCompletedFixture, activityListFixture, 60);
     expect(text).toContain("Session Wait Time Limit Reached (60s)!");
     expect(text).toContain("Instruction to LLM Client:");
     expect(text).toContain("Please call \"jules_wait_for_session\"");
+    expect(text).toContain("Recent Activities (7):");
+  });
+
+  it("formats timeout details with empty activities", () => {
+    const text = formatWaitTimeout(sessionCompletedFixture, {}, 60);
+    expect(text).toContain("Session Wait Time Limit Reached (60s)!");
+    expect(text).not.toContain("Recent Activities");
   });
 });
