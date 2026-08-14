@@ -13,6 +13,14 @@ export const SessionStateSchema = z.enum([
 ]);
 export type SessionState = z.infer<typeof SessionStateSchema>;
 
+export const TERMINAL_SESSION_STATES: readonly SessionState[] = [
+  "COMPLETED",
+  "FAILED",
+  "AWAITING_PLAN_APPROVAL",
+  "AWAITING_USER_FEEDBACK",
+  "PAUSED",
+];
+
 export const GitHubRepoContextSchema = z.object({
   startingBranch: z.string().optional(),
 });
