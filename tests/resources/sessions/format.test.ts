@@ -163,6 +163,48 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
     expect(text).not.toContain("Recent Activities");
   });
 
+  it("formats completed state with activity missing originator", () => {
+    const activitiesWithNoOriginator = {
+      activities: [
+        {
+          name: "sessions/123/activities/a1",
+          description: "Something happened",
+        },
+      ],
+    };
+    const text = formatWaitResolution(sessionCompletedFixture, activitiesWithNoOriginator);
+    expect(text).toContain("[unknown]");
+  });
+
+  it("formats session output missing pull request description", () => {
+    const sessionNoPrDesc = {
+      ...sessionCompletedFixture,
+      outputs: [
+        {
+          pullRequest: {
+            url: "https://github.com/acme/widget-app/pull/42",
+            title: "Add auth module unit tests",
+          },
+        },
+      ],
+    };
+    const text = formatSessionOutput(sessionNoPrDesc);
+    expect(text).not.toContain("Description:");
+  });
+
+  it("formats session status with activity missing originator", () => {
+    const activitiesWithNoOriginator = {
+      activities: [
+        {
+          name: "sessions/123/activities/a1",
+          description: "Something happened",
+        },
+      ],
+    };
+    const text = formatSessionStatus(sessionCompletedFixture, activitiesWithNoOriginator);
+    expect(text).toContain("[unknown]");
+  });
+
   it("formats failed state with reason", () => {
     const failedActivities = {
       activities: [

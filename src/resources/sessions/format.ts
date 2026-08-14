@@ -1,6 +1,6 @@
 import { formatActivitySummary } from "../activities/format.js";
 import type { ActivityList } from "../activities/schemas.js";
-import { TERMINAL_SESSION_STATES, type Session, type SessionList } from "./schemas.js";
+import type { Session, SessionList } from "./schemas.js";
 
 export function formatSessionList(data: SessionList): string {
   if (!data.sessions || data.sessions.length === 0) {
@@ -55,17 +55,6 @@ export function formatSessionCreated(
 }
 
 function formatStateGuidance(session: Session): string {
-  if (!TERMINAL_SESSION_STATES.includes(session.state)) {
-    switch (session.state) {
-      case "QUEUED":
-      case "PLANNING":
-      case "IN_PROGRESS":
-        return "\n\nSession still running. Poll again in 10-30 seconds for updates.";
-      default:
-        return "";
-    }
-  }
-
   switch (session.state) {
     case "COMPLETED":
       return "\n\nSession complete! Use jules_get_session_output for detailed results.";
@@ -77,6 +66,10 @@ function formatStateGuidance(session: Session): string {
       return "\n\nSession is waiting on you. Use jules_list_activities to see what Jules is asking, then jules_send_message to respond.";
     case "PAUSED":
       return "\n\nSession is paused.";
+    case "QUEUED":
+    case "PLANNING":
+    case "IN_PROGRESS":
+      return "\n\nSession still running. Poll again in 10-30 seconds for updates.";
     default:
       return "";
   }

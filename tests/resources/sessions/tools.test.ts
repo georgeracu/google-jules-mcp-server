@@ -254,6 +254,31 @@ describe("jules_wait_for_session and jules_execute_and_wait", () => {
     expect(result.content[0].text).toContain("Final State: COMPLETED");
   });
 
+  it("jules_execute_and_wait supports autoCreatePR=true and autoApprove=false", async () => {
+    let capturedBody: { requirePlanApproval?: boolean; automationMode?: string } | undefined;
+    server.use(
+      http.post(`${BASE}/sessions`, async ({ request }) => {
+        capturedBody = (await request.json()) as { requirePlanApproval?: boolean; automationMode?: string };
+        return HttpResponse.json({ id: "created-456", prompt: "p", state: "QUEUED" });
+      }),
+      http.get(`${BASE}/sessions/created-456`, () =>
+        HttpResponse.json({ id: "created-456", prompt: "p", state: "COMPLETED" })
+      )
+    );
+
+    const result = await makeHandlers().executeAndWait({
+      ...baseCreateInput,
+      autoCreatePR: true,
+      autoApprove: false,
+      maxWaitSeconds: 10,
+      includeActivities: 3,
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(capturedBody?.requirePlanApproval).toBe(true);
+    expect(capturedBody?.automationMode).toBe("AUTO_CREATE_PR");
+  });
+
   it("polls and resolves when session becomes COMPLETED", async () => {
     vi.useFakeTimers();
     let getCalls = 0;
