@@ -25,6 +25,8 @@ export const TOOL_NAMES = [
   "jules_delete_session",
   "jules_archive_session",
   "jules_unarchive_session",
+  "jules_wait_for_session",
+  "jules_execute_and_wait",
   "jules_list_activities",
   "jules_get_activity",
 ] as const;

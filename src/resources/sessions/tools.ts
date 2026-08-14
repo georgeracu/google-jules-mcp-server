@@ -11,10 +11,88 @@ import {
   formatSessionList,
   formatSessionOutput,
   formatSessionStatus,
+  formatWaitResolution,
+  formatWaitTimeout,
 } from "./format.js";
 import { CreateSessionRequestSchema, type CreateSessionRequest } from "./schemas.js";
 
 export function createSessionHandlers(sessions: SessionsClient, activities: ActivitiesClient) {
+  const pollSession = async (
+    sessionId: string,
+    maxWaitSeconds: number,
+    includeActivities: number,
+    extra?: any
+  ): Promise<ToolResult> => {
+    const clampedMaxWaitSeconds = Math.min(Math.max(maxWaitSeconds, 1), 300);
+
+    const start = Date.now();
+    const pollIntervalMs = 5000;
+    const maxWaitMs = clampedMaxWaitSeconds * 1000;
+
+    while (true) {
+      if (extra?.signal?.aborted) {
+        const session = await sessions.getSession(sessionId);
+        return textResult(`Wait operation was cancelled. Current session state: ${session.state}`);
+      }
+
+      let session;
+      try {
+        session = await sessions.getSession(sessionId);
+      } catch (error) {
+        return errorResult(`Error getting session status: ${formatErrorForUser(error)}`);
+      }
+
+      const isTerminal = [
+        "COMPLETED",
+        "FAILED",
+        "AWAITING_PLAN_APPROVAL",
+        "AWAITING_USER_FEEDBACK",
+        "PAUSED",
+      ].includes(session.state);
+
+      const elapsedMs = Date.now() - start;
+      const isTimeout = elapsedMs >= maxWaitMs;
+
+      if (isTerminal || isTimeout) {
+        try {
+          const activityList = await activities.listActivities(sessionId, {
+            pageSize: includeActivities,
+          });
+          if (isTerminal) {
+            return textResult(formatWaitResolution(session, activityList));
+          } else {
+            return textResult(formatWaitTimeout(session, activityList, clampedMaxWaitSeconds));
+          }
+        } catch (error) {
+          return errorResult(`Error fetching activities: ${formatErrorForUser(error)}`);
+        }
+      }
+
+      if (extra?._meta?.progressToken !== undefined) {
+        try {
+          await extra.sendNotification({
+            method: "notifications/progress",
+            params: {
+              progressToken: extra._meta.progressToken,
+              progress: Math.floor(elapsedMs / 1000),
+              total: clampedMaxWaitSeconds,
+              message: `Session "${sessionId}" is in state: ${session.state}. Waiting for completion... (Elapsed: ${Math.floor(elapsedMs / 1000)}s / ${clampedMaxWaitSeconds}s)`,
+            },
+          });
+        } catch (e) {
+          // Ignore notification failures
+        }
+      }
+
+      const remainingMs = maxWaitMs - (Date.now() - start);
+      const sleepMs = Math.min(pollIntervalMs, remainingMs);
+      if (sleepMs <= 0) {
+        continue;
+      }
+      await new Promise((resolve) => setTimeout(resolve, sleepMs));
+    }
+  };
+
   return {
     createSession: async ({
       repoOwner,
@@ -49,6 +127,67 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         return textResult(
           formatSessionCreated(session, { repoOwner, repoName, branch, autoApprove, autoCreatePR })
         );
+      } catch (error) {
+        return errorResult(
+          `Error creating session: ${formatErrorForUser(error)}\n\n` +
+            "Common issues:\n- Repository not connected to Jules (run jules_list_sources)\n- Invalid repository owner/name\n- Branch does not exist"
+        );
+      }
+    },
+
+    waitForSession: async (
+      {
+        sessionId,
+        maxWaitSeconds,
+        includeActivities,
+      }: {
+        sessionId: string;
+        maxWaitSeconds: number;
+        includeActivities: number;
+      },
+      extra?: any
+    ): Promise<ToolResult> => {
+      return pollSession(sessionId, maxWaitSeconds, includeActivities, extra);
+    },
+
+    executeAndWait: async (
+      {
+        repoOwner,
+        repoName,
+        prompt,
+        branch,
+        autoApprove,
+        autoCreatePR,
+        title,
+        maxWaitSeconds,
+        includeActivities,
+      }: {
+        repoOwner: string;
+        repoName: string;
+        prompt: string;
+        branch: string;
+        autoApprove: boolean;
+        autoCreatePR: boolean;
+        title?: string;
+        maxWaitSeconds: number;
+        includeActivities: number;
+      },
+      extra?: any
+    ): Promise<ToolResult> => {
+      try {
+        const request: CreateSessionRequest = CreateSessionRequestSchema.parse({
+          prompt,
+          sourceContext: {
+            source: `sources/github/${repoOwner}/${repoName}`,
+            githubRepoContext: { startingBranch: branch },
+          },
+          title: title || `${repoName}: ${prompt.slice(0, 50)}`,
+          requirePlanApproval: !autoApprove,
+          ...(autoCreatePR ? { automationMode: "AUTO_CREATE_PR" as const } : {}),
+        });
+
+        const session = await sessions.createSession(request);
+        return await pollSession(session.id, maxWaitSeconds, includeActivities, extra);
       } catch (error) {
         return errorResult(
           `Error creating session: ${formatErrorForUser(error)}\n\n` +
@@ -296,5 +435,63 @@ export function registerSessionTools(
       inputSchema: { sessionId: sessionIdField.describe("Session ID to unarchive") },
     },
     handlers.unarchiveSession
+  );
+
+  server.registerTool(
+    "jules_wait_for_session",
+    {
+      title: "Wait for Jules Session to Complete",
+      description:
+        "Wait/poll for a Jules session to complete. Automatically tracks progress, emits progress notifications, and returns a unified payload with final state, summary, and PR details upon resolution. Bounded by a wait limit to prevent timeouts.",
+      inputSchema: {
+        sessionId: sessionIdField.describe("Session ID to wait/poll for"),
+        maxWaitSeconds: z
+          .number()
+          .default(60)
+          .describe("Maximum time to wait/poll in seconds (default: 60, max: 300)"),
+        includeActivities: z
+          .number()
+          .default(5)
+          .describe("Number of recent activities to include in the output (default: 5)"),
+      },
+    },
+    handlers.waitForSession
+  );
+
+  server.registerTool(
+    "jules_execute_and_wait",
+    {
+      title: "Create and Wait for Jules Session",
+      description:
+        "Create a new Jules session and immediately wait/poll for its completion. Automatically tracks progress, emits progress notifications, and returns a unified payload with final state, summary, and PR details upon resolution. Bounded by a wait limit to prevent timeouts.",
+      inputSchema: {
+        repoOwner: z.string().describe("GitHub repository owner (username or organization)"),
+        repoName: z.string().describe("GitHub repository name"),
+        prompt: z
+          .string()
+          .describe("Detailed task description - be specific about what needs to be done"),
+        branch: z.string().default("main").describe("Starting branch name (default: main)"),
+        autoApprove: z
+          .boolean()
+          .default(true)
+          .describe(
+            "Automatically approve the execution plan (default: true). Set false to manually approve with jules_approve_plan"
+          ),
+        autoCreatePR: z
+          .boolean()
+          .default(false)
+          .describe("Automatically create pull request when task completes (default: false)"),
+        title: z.string().optional().describe("Optional custom title for the session"),
+        maxWaitSeconds: z
+          .number()
+          .default(60)
+          .describe("Maximum time to wait/poll in seconds (default: 60, max: 300)"),
+        includeActivities: z
+          .number()
+          .default(5)
+          .describe("Number of recent activities to include in the output (default: 5)"),
+      },
+    },
+    handlers.executeAndWait
   );
 }

@@ -201,7 +201,7 @@ describe("session tool handlers", () => {
 });
 
 describe("registerSessionTools", () => {
-  it("registers all 9 session tools with a working handler", async () => {
+  it("registers all 11 session tools with a working handler", async () => {
     const mcpServer = new McpServer({ name: "test", version: "0.0.0" });
     const registerSpy = vi.spyOn(mcpServer, "registerTool");
     const httpClient = new JulesHttpClient("test-key", BASE);
@@ -223,6 +223,8 @@ describe("registerSessionTools", () => {
       "jules_delete_session",
       "jules_archive_session",
       "jules_unarchive_session",
+      "jules_wait_for_session",
+      "jules_execute_and_wait",
     ]);
 
     const getStatusHandler = registerSpy.mock.calls[2][2] as (args: object) => Promise<{
@@ -230,5 +232,166 @@ describe("registerSessionTools", () => {
     }>;
     const result = await getStatusHandler({ sessionId: "1234567890", includeActivities: 3 });
     expect(result.content[0].text).toContain("Session:");
+  });
+});
+
+describe("jules_wait_for_session and jules_execute_and_wait", () => {
+  it("resolves immediately if session is COMPLETED", async () => {
+    server.use(
+      http.get(`${BASE}/sessions/1234567890`, () =>
+        HttpResponse.json({ id: "1234567890", prompt: "p", state: "COMPLETED" })
+      )
+    );
+
+    const result = await makeHandlers().waitForSession({
+      sessionId: "1234567890",
+      maxWaitSeconds: 10,
+      includeActivities: 3,
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain("Session Wait Resolved!");
+    expect(result.content[0].text).toContain("Final State: COMPLETED");
+  });
+
+  it("polls and resolves when session becomes COMPLETED", async () => {
+    vi.useFakeTimers();
+    let getCalls = 0;
+    server.use(
+      http.get(`${BASE}/sessions/1234567890`, () => {
+        getCalls++;
+        const state = getCalls === 1 ? "IN_PROGRESS" : "COMPLETED";
+        return HttpResponse.json({ id: "1234567890", prompt: "p", state });
+      })
+    );
+
+    const promise = makeHandlers().waitForSession({
+      sessionId: "1234567890",
+      maxWaitSeconds: 10,
+      includeActivities: 3,
+    });
+
+    // Advance the fake timers so the sleep resolves
+    await vi.advanceTimersByTimeAsync(5000);
+
+    const result = await promise;
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain("Session Wait Resolved!");
+    expect(result.content[0].text).toContain("Final State: COMPLETED");
+    vi.useRealTimers();
+  });
+
+  it("stops and returns timeout instruction when hitting maxWaitSeconds", async () => {
+    vi.useFakeTimers();
+    server.use(
+      http.get(`${BASE}/sessions/1234567890`, () =>
+        HttpResponse.json({ id: "1234567890", prompt: "p", state: "IN_PROGRESS" })
+      )
+    );
+
+    const promise = makeHandlers().waitForSession({
+      sessionId: "1234567890",
+      maxWaitSeconds: 3,
+      includeActivities: 3,
+    });
+
+    // Advance fake timer by 5000ms
+    await vi.advanceTimersByTimeAsync(5000);
+
+    const result = await promise;
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain("Session Wait Time Limit Reached");
+    expect(result.content[0].text).toContain("Please call \"jules_wait_for_session\"");
+    vi.useRealTimers();
+  });
+
+  it("emits progress notifications while polling", async () => {
+    vi.useFakeTimers();
+    let getCalls = 0;
+    server.use(
+      http.get(`${BASE}/sessions/1234567890`, () => {
+        getCalls++;
+        const state = getCalls === 1 ? "IN_PROGRESS" : "COMPLETED";
+        return HttpResponse.json({ id: "1234567890", prompt: "p", state });
+      })
+    );
+
+    const sentNotifications: any[] = [];
+    const mockExtra = {
+      _meta: { progressToken: "my-token" },
+      sendNotification: async (notif: any) => {
+        sentNotifications.push(notif);
+      },
+    };
+
+    const promise = makeHandlers().waitForSession(
+      {
+        sessionId: "1234567890",
+        maxWaitSeconds: 10,
+        includeActivities: 3,
+      },
+      mockExtra
+    );
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await promise;
+
+    expect(sentNotifications.length).toBeGreaterThan(0);
+    expect(sentNotifications[0].method).toBe("notifications/progress");
+    expect(sentNotifications[0].params.progressToken).toBe("my-token");
+    expect(sentNotifications[0].params.message).toContain("Waiting for completion");
+    vi.useRealTimers();
+  });
+
+  it("supports abort signal", async () => {
+    vi.useFakeTimers();
+    server.use(
+      http.get(`${BASE}/sessions/1234567890`, () =>
+        HttpResponse.json({ id: "1234567890", prompt: "p", state: "IN_PROGRESS" })
+      )
+    );
+
+    const controller = new AbortController();
+    const mockExtra = {
+      signal: controller.signal,
+    };
+
+    const promise = makeHandlers().waitForSession(
+      {
+        sessionId: "1234567890",
+        maxWaitSeconds: 10,
+        includeActivities: 3,
+      },
+      mockExtra
+    );
+
+    // Abort after first poll/sleep start
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    const result = await promise;
+    expect(result.content[0].text).toContain("Wait operation was cancelled");
+    vi.useRealTimers();
+  });
+
+  it("jules_execute_and_wait creates session and waits successfully", async () => {
+    server.use(
+      http.post(`${BASE}/sessions`, () =>
+        HttpResponse.json({ id: "created-123", prompt: "p", state: "QUEUED" })
+      ),
+      http.get(`${BASE}/sessions/created-123`, () =>
+        HttpResponse.json({ id: "created-123", prompt: "p", state: "COMPLETED" })
+      )
+    );
+
+    const result = await makeHandlers().executeAndWait({
+      ...baseCreateInput,
+      maxWaitSeconds: 10,
+      includeActivities: 3,
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain("Session Wait Resolved!");
+    expect(result.content[0].text).toContain("Final State: COMPLETED");
   });
 });
