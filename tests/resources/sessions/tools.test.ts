@@ -305,6 +305,16 @@ describe("jules_wait_for_session and jules_execute_and_wait", () => {
     vi.useRealTimers();
   });
 
+  interface MockProgressNotification {
+    method: string;
+    params: {
+      progressToken: string | number;
+      progress: number;
+      total: number;
+      message: string;
+    };
+  }
+
   it("emits progress notifications while polling", async () => {
     vi.useFakeTimers();
     let getCalls = 0;
@@ -316,11 +326,12 @@ describe("jules_wait_for_session and jules_execute_and_wait", () => {
       })
     );
 
-    const sentNotifications: any[] = [];
+    const sentNotifications: MockProgressNotification[] = [];
     const mockExtra = {
       _meta: { progressToken: "my-token" },
-      sendNotification: async (notif: any) => {
+      sendNotification: async (notif: MockProgressNotification) => {
         sentNotifications.push(notif);
+        await Promise.resolve();
       },
     };
 

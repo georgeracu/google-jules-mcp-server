@@ -16,12 +16,28 @@ import {
 } from "./format.js";
 import { CreateSessionRequestSchema, type CreateSessionRequest } from "./schemas.js";
 
+interface WaitExtra {
+  signal?: AbortSignal;
+  _meta?: {
+    progressToken?: string | number;
+  };
+  sendNotification?: (notification: {
+    method: "notifications/progress";
+    params: {
+      progressToken: string | number;
+      progress: number;
+      total: number;
+      message: string;
+    };
+  }) => Promise<void>;
+}
+
 export function createSessionHandlers(sessions: SessionsClient, activities: ActivitiesClient) {
   const pollSession = async (
     sessionId: string,
     maxWaitSeconds: number,
     includeActivities: number,
-    extra?: any
+    extra?: WaitExtra
   ): Promise<ToolResult> => {
     const clampedMaxWaitSeconds = Math.min(Math.max(maxWaitSeconds, 1), 300);
 
@@ -68,7 +84,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         }
       }
 
-      if (extra?._meta?.progressToken !== undefined) {
+      if (extra?._meta?.progressToken !== undefined && extra.sendNotification !== undefined) {
         try {
           await extra.sendNotification({
             method: "notifications/progress",
@@ -79,7 +95,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
               message: `Session "${sessionId}" is in state: ${session.state}. Waiting for completion... (Elapsed: ${Math.floor(elapsedMs / 1000)}s / ${clampedMaxWaitSeconds}s)`,
             },
           });
-        } catch (e) {
+        } catch {
           // Ignore notification failures
         }
       }
@@ -145,7 +161,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         maxWaitSeconds: number;
         includeActivities: number;
       },
-      extra?: any
+      extra?: WaitExtra
     ): Promise<ToolResult> => {
       return pollSession(sessionId, maxWaitSeconds, includeActivities, extra);
     },
@@ -172,7 +188,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         maxWaitSeconds: number;
         includeActivities: number;
       },
-      extra?: any
+      extra?: WaitExtra
     ): Promise<ToolResult> => {
       try {
         const request: CreateSessionRequest = CreateSessionRequestSchema.parse({
