@@ -142,6 +142,25 @@ describe("formatActivityDetail", () => {
     expect(text).toContain("Session failed");
     expect(text).not.toContain("Reason:");
   });
+
+  it("formats activity list with empty progress update details", () => {
+    const activityEmptyProgress = {
+      name: "sessions/123/activities/a1",
+      progressUpdated: {},
+    };
+    const text = formatActivityList({ activities: [activityEmptyProgress] }, "sess-1");
+    expect(text).toContain("Progress update\n");
+  });
+
+  it("formats activity list with empty plan steps", () => {
+    const activityWithEmptySteps = {
+      name: "sessions/123/activities/a1",
+      planGenerated: { plan: { steps: [] } },
+    };
+    const text = formatActivityList({ activities: [activityWithEmptySteps] }, "sess-1");
+    expect(text).toContain("Generated execution plan:");
+    expect(text).not.toContain("Steps:");
+  });
 });
 
 describe("formatActivityList", () => {

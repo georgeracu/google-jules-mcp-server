@@ -30,6 +30,20 @@ describe("formatSessionList", () => {
     expect(text).toContain("PR: https://github.com/acme/widget-app/pull/18");
     expect(text).toContain(`pageToken: ${sessionListFixture.nextPageToken}`);
   });
+
+  it("formats session list with untitled session", () => {
+    const listWithUntitled = {
+      sessions: [
+        {
+          id: "untitled-1",
+          prompt: "Do something",
+          state: "COMPLETED" as const,
+        },
+      ],
+    };
+    const text = formatSessionList(listWithUntitled);
+    expect(text).toContain("Untitled");
+  });
 });
 
 describe("formatSessionCreated", () => {
@@ -62,6 +76,25 @@ describe("formatSessionStatus", () => {
     const text = formatSessionStatus(sessionCompletedFixture, {});
     expect(text).toContain("Pull Request Created:");
     expect(text).toContain("https://github.com/acme/widget-app/pull/42");
+  });
+
+  it("formats session status with untitled session and pr without description", () => {
+    const sessionUntitledNoPrDesc = {
+      id: "untitled-2",
+      prompt: "Do something",
+      state: "COMPLETED" as const,
+      outputs: [
+        {
+          pullRequest: {
+            url: "https://github.com/acme/widget-app/pull/42",
+            title: "Add auth module unit tests",
+          },
+        },
+      ],
+    };
+    const text = formatSessionStatus(sessionUntitledNoPrDesc, {});
+    expect(text).toContain("Session: Untitled");
+    expect(text).not.toContain("Description:");
   });
 
   it("finds and includes pull request details when PR is at a non-zero index", () => {
@@ -305,5 +338,18 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
     const text = formatWaitTimeout(sessionCompletedFixture, {}, 60);
     expect(text).toContain("Session Wait Time Limit Reached (60s)!");
     expect(text).not.toContain("Recent Activities");
+  });
+
+  it("formats wait timeout with activities missing originator", () => {
+    const activitiesWithNoOriginator = {
+      activities: [
+        {
+          name: "sessions/123/activities/a1",
+          description: "Something happened",
+        },
+      ],
+    };
+    const text = formatWaitTimeout(sessionCompletedFixture, activitiesWithNoOriginator, 60);
+    expect(text).toContain("[unknown]");
   });
 });
