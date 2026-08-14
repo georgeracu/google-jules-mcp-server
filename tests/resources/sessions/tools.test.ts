@@ -405,4 +405,58 @@ describe("jules_wait_for_session and jules_execute_and_wait", () => {
     expect(result.content[0].text).toContain("Session Wait Resolved!");
     expect(result.content[0].text).toContain("Final State: COMPLETED");
   });
+
+  it("returns error result if getSession fails during wait", async () => {
+    server.use(
+      http.get(`${BASE}/sessions/1234567890`, () =>
+        HttpResponse.json({ error: { message: "unauthorized" } }, { status: 401 })
+      )
+    );
+
+    const result = await makeHandlers().waitForSession({
+      sessionId: "1234567890",
+      maxWaitSeconds: 10,
+      includeActivities: 3,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("Error getting session status");
+  });
+
+  it("returns error result if listActivities fails during wait resolution", async () => {
+    server.use(
+      http.get(`${BASE}/sessions/1234567890`, () =>
+        HttpResponse.json({ id: "1234567890", prompt: "p", state: "COMPLETED" })
+      ),
+      http.get(`${BASE}/sessions/1234567890/activities`, () =>
+        HttpResponse.json({ error: { message: "internal error" } }, { status: 500 })
+      )
+    );
+
+    const result = await makeHandlers().waitForSession({
+      sessionId: "1234567890",
+      maxWaitSeconds: 10,
+      includeActivities: 3,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("Error fetching activities");
+  });
+
+  it("returns error result if executeAndWait fails to create session", async () => {
+    server.use(
+      http.post(`${BASE}/sessions`, () =>
+        HttpResponse.json({ error: { message: "repo not connected" } }, { status: 404 })
+      )
+    );
+
+    const result = await makeHandlers().executeAndWait({
+      ...baseCreateInput,
+      maxWaitSeconds: 10,
+      includeActivities: 3,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("Error creating session");
+  });
 });

@@ -5,6 +5,8 @@ import {
   formatSessionList,
   formatSessionOutput,
   formatSessionStatus,
+  formatWaitResolution,
+  formatWaitTimeout,
 } from "../../../src/resources/sessions/format.js";
 import { activityListFixture } from "../../fixtures/activities.js";
 import {
@@ -130,5 +132,51 @@ describe("formatSessionOutput", () => {
     expect(text).toContain("Pull Request:");
     expect(text).toContain("Number: #18");
     expect(text).toContain("Review comments and fixes.");
+  });
+});
+
+describe("formatWaitResolution and formatWaitTimeout", () => {
+  it("formats completed state with PR details and activities", () => {
+    const text = formatWaitResolution(sessionCompletedFixture, activityListFixture);
+    expect(text).toContain("Session Wait Resolved!");
+    expect(text).toContain("Final State: COMPLETED");
+    expect(text).toContain("Session completed successfully.");
+    expect(text).toContain("Pull Request(s) Created:");
+    expect(text).toContain("Recent Activities (7):");
+  });
+
+  it("formats failed state with reason", () => {
+    const failedActivities = {
+      activities: [
+        {
+          name: "sessions/123/activities/a1",
+          sessionFailed: { reason: "Cloud VM out of memory" },
+        },
+      ],
+    };
+    const text = formatWaitResolution(
+      { ...sessionCompletedFixture, state: "FAILED" as const },
+      failedActivities
+    );
+    expect(text).toContain("Final State: FAILED");
+    expect(text).toContain("Session failed. Reason: Cloud VM out of memory");
+  });
+
+  it("formats other states like awaiting approval, user feedback, paused, default", () => {
+    const states = ["AWAITING_PLAN_APPROVAL", "AWAITING_USER_FEEDBACK", "PAUSED", "QUEUED"] as const;
+    for (const state of states) {
+      const text = formatWaitResolution(
+        { ...sessionCompletedFixture, state },
+        activityListFixture
+      );
+      expect(text).toContain(`Final State: ${state}`);
+    }
+  });
+
+  it("formats timeout details", () => {
+    const text = formatWaitTimeout(sessionCompletedFixture, activityListFixture, 60);
+    expect(text).toContain("Session Wait Time Limit Reached (60s)!");
+    expect(text).toContain("Instruction to LLM Client:");
+    expect(text).toContain("Please call \"jules_wait_for_session\"");
   });
 });
