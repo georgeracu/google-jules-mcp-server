@@ -384,4 +384,12 @@ describe("formatChangeSet and getTouchedFiles edge cases", () => {
     const text = formatChangeSet({ gitPatch: { unidiffPatch: patch } }, "  ");
     expect(text).toContain("  Diff:\n    diff --git a/f b/f\n\n    +line2\n");
   });
+
+  it("formats changeSet artifact with missing source", () => {
+    const text = formatActivityDetail({
+      name: "a",
+      artifacts: [{ changeSet: {} }],
+    });
+    expect(text).toContain("Code change on unknown source:");
+  });
 });
