@@ -4,6 +4,7 @@ import {
   formatActivityDetail,
   formatActivityList,
   formatActivitySummary,
+  formatChangeSet,
   getTouchedFiles,
 } from "../../../src/resources/activities/format.js";
 import {
@@ -343,5 +344,44 @@ describe("output caps", () => {
     const files = getTouchedFiles("--- foo.ts\n+++ bar.ts\n");
     expect(files).toContain("foo.ts");
     expect(files).toContain("bar.ts");
+  });
+});
+
+describe("formatChangeSet and getTouchedFiles edge cases", () => {
+  it("formats changeSet without source or gitPatch", () => {
+    expect(formatChangeSet({})).toBe("");
+  });
+
+  it("formats changeSet without suggestedCommitMessage or unidiffPatch", () => {
+    const text = formatChangeSet({ source: "src", gitPatch: {} });
+    expect(text).toContain("Source: src");
+    expect(text).not.toContain("Suggested commit message:");
+    expect(text).not.toContain("Diff:");
+  });
+
+  it("handles unidiffPatch with file additions/deletions and /dev/null", () => {
+    const patch =
+      "diff --git invalid_header\n" +
+      "--- /dev/null\n" +
+      "+++ b/added.ts\n" +
+      "--- a/deleted.ts\n" +
+      "+++ /dev/null\n" +
+      "--- \n" +
+      "+++ \n" +
+      "--- /dev/null\n" +
+      "+++ /dev/null\n";
+    const files = getTouchedFiles(patch);
+    expect(files).toContain("added.ts");
+    expect(files).toContain("deleted.ts");
+    expect(files).not.toContain("/dev/null");
+
+    const text = formatChangeSet({ gitPatch: { unidiffPatch: patch } });
+    expect(text).toContain("Touched files:\n  - added.ts\n  - deleted.ts");
+  });
+
+  it("formats empty diff lines correctly without trailing whitespace", () => {
+    const patch = "diff --git a/f b/f\n\n+line2";
+    const text = formatChangeSet({ gitPatch: { unidiffPatch: patch } }, "  ");
+    expect(text).toContain("  Diff:\n    diff --git a/f b/f\n\n    +line2\n");
   });
 });
