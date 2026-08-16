@@ -2,24 +2,17 @@ import type { Activity, ActivityList } from "./schemas.js";
 
 export function getTouchedFiles(patch: string): string[] {
   const files = new Set<string>();
-  const lines = patch.split("\n");
-  for (const line of lines) {
+  for (const line of patch.split("\n")) {
     if (line.startsWith("diff --git ")) {
       const match = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
       if (match) {
         files.add(match[1]);
         files.add(match[2]);
       }
-    } else if (line.startsWith("--- a/") || line.startsWith("+++ b/")) {
-      const file = line.slice(6).split("\t")[0].trim();
+    } else if (line.startsWith("--- ") || line.startsWith("+++ ")) {
+      const file = line.slice(4).split("\t")[0].trim().replace(/^[ab]\//, "");
       if (file && file !== "/dev/null") {
         files.add(file);
-      }
-    } else if (line.startsWith("--- ") || line.startsWith("+++ ")) {
-      const content = line.slice(4).split("\t")[0].trim();
-      if (content && content !== "/dev/null") {
-        const cleaned = content.replace(/^[ab]\//, "");
-        files.add(cleaned);
       }
     }
   }
@@ -198,7 +191,7 @@ export function formatActivityDetail(activity: Activity): string {
   const lastNewline = sliced.lastIndexOf("\n");
   if (lastNewline !== -1) {
     const lineAtCut = sliced.slice(lastNewline + 1);
-    if (lineAtCut.includes("[+") || lineAtCut.startsWith("[")) {
+    if (lineAtCut.includes("[+")) {
       sliced = sliced.slice(0, lastNewline);
     }
   }
@@ -261,7 +254,7 @@ function formatActivityListItem(activity: Activity, index: number, sessionId: st
   const lastNewline = sliced.lastIndexOf("\n");
   if (lastNewline !== -1) {
     const lineAtCut = sliced.slice(lastNewline + 1);
-    if (lineAtCut.includes("[+") || lineAtCut.startsWith("[")) {
+    if (lineAtCut.includes("[+")) {
       sliced = sliced.slice(0, lastNewline);
     }
   }
