@@ -167,6 +167,19 @@ describe("formatSessionOutput", () => {
     expect(text).toContain("Review comments and fixes.");
   });
 
+  it("renders both the pull request and the changeSet when a session's outputs contain both", () => {
+    const text = formatSessionOutput(sessionCompletedWithMultipleOutputsFixture);
+    expect(text).toContain("Pull Request:");
+    expect(text).toContain("Number: #18");
+    expect(text).toContain("Review comments and fixes.");
+    expect(text).toContain("Code Change:");
+    expect(text).toContain("Source: sources/github/acme/widget-app");
+    expect(text).toContain(
+      "Suggested commit message: Code Review: PR 17 (fix/encode-path-segments)"
+    );
+    expect(text).toContain("Diff:\n    diff --git a/foo b/foo");
+  });
+
   it("renders code change details when only changeSet is present in outputs", () => {
     const sessionWithChangeSet = {
       id: "7777777777",
