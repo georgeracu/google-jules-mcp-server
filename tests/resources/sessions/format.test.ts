@@ -30,6 +30,20 @@ describe("formatSessionList", () => {
     expect(text).toContain("PR: https://github.com/acme/widget-app/pull/18");
     expect(text).toContain(`pageToken: ${sessionListFixture.nextPageToken}`);
   });
+
+  it("formats session list with untitled session", () => {
+    const listWithUntitled = {
+      sessions: [
+        {
+          id: "untitled-1",
+          prompt: "Do something",
+          state: "COMPLETED" as const,
+        },
+      ],
+    };
+    const text = formatSessionList(listWithUntitled);
+    expect(text).toContain("Untitled");
+  });
 });
 
 describe("formatSessionCreated", () => {
@@ -62,6 +76,25 @@ describe("formatSessionStatus", () => {
     const text = formatSessionStatus(sessionCompletedFixture, {});
     expect(text).toContain("Pull Request Created:");
     expect(text).toContain("https://github.com/acme/widget-app/pull/42");
+  });
+
+  it("formats session status with untitled session and pr without description", () => {
+    const sessionUntitledNoPrDesc = {
+      id: "untitled-2",
+      prompt: "Do something",
+      state: "COMPLETED" as const,
+      outputs: [
+        {
+          pullRequest: {
+            url: "https://github.com/acme/widget-app/pull/42",
+            title: "Add auth module unit tests",
+          },
+        },
+      ],
+    };
+    const text = formatSessionStatus(sessionUntitledNoPrDesc, {});
+    expect(text).toContain("Session: Untitled");
+    expect(text).not.toContain("Description:");
   });
 
   it("finds and includes pull request details when PR is at a non-zero index", () => {
@@ -132,6 +165,69 @@ describe("formatSessionOutput", () => {
     expect(text).toContain("Pull Request:");
     expect(text).toContain("Number: #18");
     expect(text).toContain("Review comments and fixes.");
+  });
+
+  it("renders both the pull request and the changeSet when a session's outputs contain both", () => {
+    const text = formatSessionOutput(sessionCompletedWithMultipleOutputsFixture);
+    expect(text).toContain("Pull Request:");
+    expect(text).toContain("Number: #18");
+    expect(text).toContain("Review comments and fixes.");
+    expect(text).toContain("Code Change:");
+    expect(text).toContain("Source: sources/github/acme/widget-app");
+    expect(text).toContain(
+      "Suggested commit message: Code Review: PR 17 (fix/encode-path-segments)"
+    );
+    expect(text).toContain("Diff:\n    diff --git a/foo b/foo");
+  });
+
+  it("renders code change details when only changeSet is present in outputs", () => {
+    const sessionWithChangeSet = {
+      id: "7777777777",
+      title: "Jules Code Review",
+      prompt: "Review the code change",
+      state: "COMPLETED" as const,
+      outputs: [
+        {
+          changeSet: {
+            source: "sources/github/acme/widget-app",
+            gitPatch: {
+              suggestedCommitMessage: "Fix path segmentation",
+              unidiffPatch: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1,3 +1,3 @@\n-old\n+new",
+            },
+          },
+        },
+      ],
+    };
+    const text = formatSessionOutput(sessionWithChangeSet);
+    expect(text).toContain("Code Change:");
+    expect(text).toContain("Source: sources/github/acme/widget-app");
+    expect(text).toContain("Suggested commit message: Fix path segmentation");
+    expect(text).toContain("Touched files:\n    - foo");
+    expect(text).toContain("Diff:\n    diff --git a/foo b/foo");
+  });
+
+  it("truncates the diff when it exceeds the character budget", () => {
+    const sessionWithHugeDiff = {
+      id: "8888888888",
+      title: "Jules Large Patch",
+      prompt: "Generate a large patch",
+      state: "COMPLETED" as const,
+      outputs: [
+        {
+          changeSet: {
+            source: "sources/github/acme/widget-app",
+            gitPatch: {
+              suggestedCommitMessage: "Fix lots of things",
+              unidiffPatch: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n" + "x".repeat(3000),
+            },
+          },
+        },
+      ],
+    };
+    const text = formatSessionOutput(sessionWithHugeDiff);
+    expect(text).toContain("Code Change:");
+    expect(text).toContain("chars omitted");
+    expect(text).toContain("re-requesting this activity will not recover it");
   });
 });
 
@@ -255,5 +351,18 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
     const text = formatWaitTimeout(sessionCompletedFixture, {}, 60);
     expect(text).toContain("Session Wait Time Limit Reached (60s)!");
     expect(text).not.toContain("Recent Activities");
+  });
+
+  it("formats wait timeout with activities missing originator", () => {
+    const activitiesWithNoOriginator = {
+      activities: [
+        {
+          name: "sessions/123/activities/a1",
+          description: "Something happened",
+        },
+      ],
+    };
+    const text = formatWaitTimeout(sessionCompletedFixture, activitiesWithNoOriginator, 60);
+    expect(text).toContain("[unknown]");
   });
 });

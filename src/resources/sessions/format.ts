@@ -1,4 +1,4 @@
-import { formatActivitySummary } from "../activities/format.js";
+import { formatActivitySummary, formatChangeSet } from "../activities/format.js";
 import type { ActivityList } from "../activities/schemas.js";
 import type { Session, SessionList } from "./schemas.js";
 
@@ -110,7 +110,9 @@ export function formatSessionOutput(session: Session): string {
   }
 
   const pr = session.outputs?.find((o) => o.pullRequest)?.pullRequest;
-  if (!pr) {
+  const changeSet = session.outputs?.find((o) => o.changeSet)?.changeSet;
+
+  if (!pr && !changeSet) {
     return (
       "Session completed but no pull request was created.\n\n" +
       `Title: ${session.title}\n` +
@@ -120,17 +122,29 @@ export function formatSessionOutput(session: Session): string {
     );
   }
 
+  const sections: string[] = [];
+
+  if (pr) {
+    sections.push(
+      "Pull Request:\n" +
+        `  URL: ${pr.url}\n` +
+        `  Title: ${pr.title}\n` +
+        (pr.number ? `  Number: #${pr.number}\n` : "") +
+        (pr.description ? `  Description: ${pr.description}\n` : "") +
+        "\n" +
+        "Visit the PR URL to review changes and merge when ready."
+    );
+  }
+
+  if (changeSet) {
+    sections.push("Code Change:\n" + formatChangeSet(changeSet, "  "));
+  }
+
   return (
     "Session Output:\n\n" +
     `Session: ${session.title}\n` +
     `State: ${session.state}\n\n` +
-    "Pull Request:\n" +
-    `  URL: ${pr.url}\n` +
-    `  Title: ${pr.title}\n` +
-    (pr.number ? `  Number: #${pr.number}\n` : "") +
-    (pr.description ? `  Description: ${pr.description}\n` : "") +
-    "\n" +
-    "Visit the PR URL to review changes and merge when ready."
+    sections.join("\n\n")
   );
 }
 
