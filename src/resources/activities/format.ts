@@ -9,10 +9,12 @@ export function getTouchedFiles(patch: string): string[] {
         files.add(match[1]);
         files.add(match[2]);
       }
-    } else if (line.startsWith("--- ")) {
+    }
+    if (line.startsWith("--- ")) {
       const file = line.slice(4).split("\t")[0].trim().replace(/^a\//, "");
       if (file && file !== "/dev/null") files.add(file);
-    } else if (line.startsWith("+++ ")) {
+    }
+    if (line.startsWith("+++ ")) {
       const file = line.slice(4).split("\t")[0].trim().replace(/^b\//, "");
       if (file && file !== "/dev/null") files.add(file);
     }
@@ -188,17 +190,12 @@ export function formatActivityDetail(activity: Activity): string {
   const text = detailText(activity);
   if (text.length <= DETAIL_CHAR_BUDGET) return text;
 
-  let sliced = text.slice(0, DETAIL_CHAR_BUDGET);
-  const lastNewline = sliced.lastIndexOf("\n");
-  if (lastNewline !== -1) {
-    const lineAtCut = sliced.slice(lastNewline + 1);
-    if (lineAtCut.includes("[+")) {
-      sliced = sliced.slice(0, lastNewline);
-    }
-  }
-
-  const omitted = text.length - sliced.length;
-  return `${sliced}...\n${formatOmittedNote(omitted)}\n`;
+  const omitted = text.length - DETAIL_CHAR_BUDGET;
+  return (
+    `${text.slice(0, DETAIL_CHAR_BUDGET)}...\n` +
+    `[+${omitted} chars omitted - this is the largest rendering available and no tool ` +
+    `returns the remainder, so re-requesting this activity will not recover it]\n`
+  );
 }
 
 function listItemText(activity: Activity, index: number): string {
@@ -251,18 +248,9 @@ function formatActivityListItem(activity: Activity, index: number, sessionId: st
   const body = listItemText(activity, index);
   if (body.length <= LIST_ITEM_CHAR_BUDGET + LIST_ITEM_SLACK) return body;
 
-  let sliced = body.slice(0, LIST_ITEM_CHAR_BUDGET);
-  const lastNewline = sliced.lastIndexOf("\n");
-  if (lastNewline !== -1) {
-    const lineAtCut = sliced.slice(lastNewline + 1);
-    if (lineAtCut.includes("[+")) {
-      sliced = sliced.slice(0, lastNewline);
-    }
-  }
-
-  const omitted = body.length - sliced.length;
+  const omitted = body.length - LIST_ITEM_CHAR_BUDGET;
   return (
-    `${sliced}...\n` +
+    `${body.slice(0, LIST_ITEM_CHAR_BUDGET)}...\n` +
     `   [+${omitted} chars - use jules_get_activity with sessionId "${sessionId}" ` +
     `and activityId "${activityRef(activity)}" for the expanded entry]\n`
   );
