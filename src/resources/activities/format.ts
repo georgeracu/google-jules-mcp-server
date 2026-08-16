@@ -26,6 +26,22 @@ export function getTouchedFiles(patch: string): string[] {
   return Array.from(files);
 }
 
+const SUMMARY_CHAR_BUDGET = 100;
+const LIST_ITEM_CHAR_BUDGET = 800;
+const LIST_PAGE_CHAR_BUDGET = 10_000;
+const DETAIL_CHAR_BUDGET = 8_000;
+const CHANGE_SET_DIFF_CHAR_BUDGET = 2_000;
+/** Below this the recovery hint costs more than the cut saves, so leave the item whole. */
+const LIST_ITEM_SLACK = 150;
+const UNKNOWN_ACTIVITY_TEXT = "Activity occurred";
+
+function formatOmittedNote(omitted: number): string {
+  return (
+    `[+${omitted} chars omitted - this is the largest rendering available and no tool ` +
+    `returns the remainder, so re-requesting this activity will not recover it]`
+  );
+}
+
 export function formatChangeSet(
   changeSet: NonNullable<NonNullable<Activity["artifacts"]>[number]["changeSet"]>,
   indent = ""
@@ -48,14 +64,12 @@ export function formatChangeSet(
     }
     if (patch.unidiffPatch) {
       res += `${indent}Diff:\n`;
-      const budget = 2000;
       let diffText = patch.unidiffPatch;
-      if (diffText.length > budget) {
-        const omitted = diffText.length - budget;
+      if (diffText.length > CHANGE_SET_DIFF_CHAR_BUDGET) {
+        const omitted = diffText.length - CHANGE_SET_DIFF_CHAR_BUDGET;
         diffText =
-          diffText.slice(0, budget) +
-          `...\n[+${omitted} chars omitted - this is the largest rendering available and no tool ` +
-          `returns the remainder, so re-requesting this activity will not recover it]`;
+          diffText.slice(0, CHANGE_SET_DIFF_CHAR_BUDGET) +
+          `...\n${formatOmittedNote(omitted)}`;
       }
       const indentedDiff = diffText
         .split("\n")
@@ -66,14 +80,6 @@ export function formatChangeSet(
   }
   return res;
 }
-
-const SUMMARY_CHAR_BUDGET = 100;
-const LIST_ITEM_CHAR_BUDGET = 800;
-const LIST_PAGE_CHAR_BUDGET = 10_000;
-const DETAIL_CHAR_BUDGET = 8_000;
-/** Below this the recovery hint costs more than the cut saves, so leave the item whole. */
-const LIST_ITEM_SLACK = 150;
-const UNKNOWN_ACTIVITY_TEXT = "Activity occurred";
 
 function activityRef(activity: Activity): string {
   const segments = activity.name.split("/");
@@ -188,12 +194,17 @@ export function formatActivityDetail(activity: Activity): string {
   const text = detailText(activity);
   if (text.length <= DETAIL_CHAR_BUDGET) return text;
 
-  const omitted = text.length - DETAIL_CHAR_BUDGET;
-  return (
-    `${text.slice(0, DETAIL_CHAR_BUDGET)}...\n` +
-    `[+${omitted} chars omitted - this is the largest rendering available and no tool ` +
-    `returns the remainder, so re-requesting this activity will not recover it]\n`
-  );
+  let sliced = text.slice(0, DETAIL_CHAR_BUDGET);
+  const lastNewline = sliced.lastIndexOf("\n");
+  if (lastNewline !== -1) {
+    const lineAtCut = sliced.slice(lastNewline + 1);
+    if (lineAtCut.includes("[+") || lineAtCut.startsWith("[")) {
+      sliced = sliced.slice(0, lastNewline);
+    }
+  }
+
+  const omitted = text.length - sliced.length;
+  return `${sliced}...\n${formatOmittedNote(omitted)}\n`;
 }
 
 function listItemText(activity: Activity, index: number): string {
@@ -246,9 +257,18 @@ function formatActivityListItem(activity: Activity, index: number, sessionId: st
   const body = listItemText(activity, index);
   if (body.length <= LIST_ITEM_CHAR_BUDGET + LIST_ITEM_SLACK) return body;
 
-  const omitted = body.length - LIST_ITEM_CHAR_BUDGET;
+  let sliced = body.slice(0, LIST_ITEM_CHAR_BUDGET);
+  const lastNewline = sliced.lastIndexOf("\n");
+  if (lastNewline !== -1) {
+    const lineAtCut = sliced.slice(lastNewline + 1);
+    if (lineAtCut.includes("[+") || lineAtCut.startsWith("[")) {
+      sliced = sliced.slice(0, lastNewline);
+    }
+  }
+
+  const omitted = body.length - sliced.length;
   return (
-    `${body.slice(0, LIST_ITEM_CHAR_BUDGET)}...\n` +
+    `${sliced}...\n` +
     `   [+${omitted} chars - use jules_get_activity with sessionId "${sessionId}" ` +
     `and activityId "${activityRef(activity)}" for the expanded entry]\n`
   );

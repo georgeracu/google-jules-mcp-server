@@ -287,6 +287,85 @@ describe("output caps", () => {
     expect(text).toContain("chars omitted");
   });
 
+  it("truncates multiple large changeSet artifacts cleanly without garbling partial notes", () => {
+    const patch = "diff --git a/f b/f\n" + "x".repeat(3000);
+    const artifacts = Array.from({ length: 5 }, () => ({
+      changeSet: {
+        source: "sources/github/acme/widget-app",
+        gitPatch: { unidiffPatch: patch },
+      },
+    }));
+    const text = formatActivityDetail({
+      name: "sessions/s1/activities/a1",
+      artifacts,
+    });
+
+    expect(text.length).toBeLessThan(8250);
+    expect(text).toContain("chars omitted");
+    expect(text).not.toMatch(/\[\+\d+ chars omitted - this is the largest rendering available and no tool returns the remainder, so re-requesting this activity will not recover it\]\.\.\./);
+  });
+
+  it("strips partial note line when detail cut lands inside an existing omitted note", () => {
+    const patch2000 = "diff --git a/f b/f\n" + "x".repeat(5000);
+    const patch1307 = "diff --git a/f b/f\n" + "x".repeat(3500);
+
+    const artifacts = [
+      { changeSet: { gitPatch: { unidiffPatch: patch2000 } } },
+      { changeSet: { gitPatch: { unidiffPatch: patch2000 } } },
+      { changeSet: { gitPatch: { unidiffPatch: patch2000 } } },
+      { changeSet: { gitPatch: { unidiffPatch: patch1307 } } },
+    ];
+
+    const text = formatActivityDetail({
+      name: "sessions/s1/activities/a1",
+      artifacts,
+    });
+
+    expect(text.length).toBeLessThan(8250);
+    expect(text).toContain("chars omitted");
+  });
+
+  it("strips partial note line when list item cut lands inside an existing omitted note", () => {
+    const patch650 = "diff --git a/f b/f\n" + "x".repeat(2500);
+    const text = formatActivityList(
+      {
+        activities: [
+          {
+            name: "sessions/s1/activities/a1",
+            artifacts: [{ changeSet: { gitPatch: { unidiffPatch: patch650 } } }],
+          },
+        ],
+      },
+      "sess-1"
+    );
+
+    expect(text).toContain("use jules_get_activity");
+  });
+
+  it("truncates detail text when there are no newlines", () => {
+    const text = formatActivityDetail({
+      name: "a",
+      description: "x".repeat(10_000),
+    });
+    expect(text.length).toBeLessThan(8250);
+    expect(text).toContain("chars omitted");
+  });
+
+  it("truncates list item body when there are no newlines", () => {
+    const text = formatActivityList(
+      {
+        activities: [
+          {
+            name: "sessions/s1/activities/a1",
+            description: "x".repeat(2000),
+          },
+        ],
+      },
+      "sess-1"
+    );
+    expect(text).toContain("use jules_get_activity");
+  });
+
   it("tells the caller a capped detail response is terminal, not a page to follow", () => {
     const text = formatActivityDetail({
       name: "sessions/s1/activities/a1",
