@@ -9,11 +9,12 @@ export function getTouchedFiles(patch: string): string[] {
         files.add(match[1]);
         files.add(match[2]);
       }
-    } else if (line.startsWith("--- ") || line.startsWith("+++ ")) {
-      const file = line.slice(4).split("\t")[0].trim().replace(/^[ab]\//, "");
-      if (file && file !== "/dev/null") {
-        files.add(file);
-      }
+    } else if (line.startsWith("--- ")) {
+      const file = line.slice(4).split("\t")[0].trim().replace(/^a\//, "");
+      if (file && file !== "/dev/null") files.add(file);
+    } else if (line.startsWith("+++ ")) {
+      const file = line.slice(4).split("\t")[0].trim().replace(/^b\//, "");
+      if (file && file !== "/dev/null") files.add(file);
     }
   }
   return Array.from(files);
@@ -48,14 +49,14 @@ export function formatChangeSet(
     if (patch.suggestedCommitMessage) {
       res += `${indent}Suggested commit message: ${patch.suggestedCommitMessage}\n`;
     }
-    const touchedFiles = patch.unidiffPatch ? getTouchedFiles(patch.unidiffPatch) : [];
-    if (touchedFiles.length > 0) {
-      res += `${indent}Touched files:\n`;
-      for (const file of touchedFiles) {
-        res += `${indent}  - ${file}\n`;
-      }
-    }
     if (patch.unidiffPatch) {
+      const touchedFiles = getTouchedFiles(patch.unidiffPatch);
+      if (touchedFiles.length > 0) {
+        res += `${indent}Touched files:\n`;
+        for (const file of touchedFiles) {
+          res += `${indent}  - ${file}\n`;
+        }
+      }
       res += `${indent}Diff:\n`;
       let diffText = patch.unidiffPatch;
       if (diffText.length > CHANGE_SET_DIFF_CHAR_BUDGET) {
