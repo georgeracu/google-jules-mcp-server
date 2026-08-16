@@ -1,4 +1,4 @@
-import { formatActivitySummary } from "../activities/format.js";
+import { formatActivitySummary, formatChangeSet } from "../activities/format.js";
 import type { ActivityList } from "../activities/schemas.js";
 import type { Session, SessionList } from "./schemas.js";
 
@@ -110,7 +110,9 @@ export function formatSessionOutput(session: Session): string {
   }
 
   const pr = session.outputs?.find((o) => o.pullRequest)?.pullRequest;
-  if (!pr) {
+  const changeSet = session.outputs?.find((o) => o.changeSet)?.changeSet;
+
+  if (!pr && !changeSet) {
     return (
       "Session completed but no pull request was created.\n\n" +
       `Title: ${session.title}\n` +
@@ -120,16 +122,107 @@ export function formatSessionOutput(session: Session): string {
     );
   }
 
+  const sections: string[] = [];
+
+  if (pr) {
+    sections.push(
+      "Pull Request:\n" +
+        `  URL: ${pr.url}\n` +
+        `  Title: ${pr.title}\n` +
+        (pr.number ? `  Number: #${pr.number}\n` : "") +
+        (pr.description ? `  Description: ${pr.description}\n` : "") +
+        "\n" +
+        "Visit the PR URL to review changes and merge when ready."
+    );
+  }
+
+  if (changeSet) {
+    sections.push("Code Change:\n" + formatChangeSet(changeSet, "  "));
+  }
+
   return (
     "Session Output:\n\n" +
     `Session: ${session.title}\n` +
     `State: ${session.state}\n\n` +
-    "Pull Request:\n" +
-    `  URL: ${pr.url}\n` +
-    `  Title: ${pr.title}\n` +
-    (pr.number ? `  Number: #${pr.number}\n` : "") +
-    (pr.description ? `  Description: ${pr.description}\n` : "") +
-    "\n" +
-    "Visit the PR URL to review changes and merge when ready."
+    sections.join("\n\n")
   );
+}
+
+export function formatWaitResolution(session: Session, activities: ActivityList): string {
+  let text = `Session Wait Resolved!\n\n`;
+  text += `Session ID: ${session.id}\n`;
+  text += `Title: ${session.title ?? "Untitled"}\n`;
+  text += `Final State: ${session.state}\n`;
+  text += `Prompt: ${session.prompt}\n\n`;
+
+  text += "Summary: ";
+  switch (session.state) {
+    case "COMPLETED":
+      text += "Session completed successfully.\n";
+      break;
+    case "FAILED": {
+      const failReason = activities.activities?.find((a) => a.sessionFailed)?.sessionFailed?.reason;
+      text += `Session failed.${failReason ? ` Reason: ${failReason}` : ""}\n`;
+      break;
+    }
+    case "AWAITING_PLAN_APPROVAL":
+      text += "The execution plan was generated and is awaiting your approval.\n";
+      break;
+    case "AWAITING_USER_FEEDBACK":
+      text += "Jules is waiting for user feedback/input.\n";
+      break;
+    case "PAUSED":
+      text += "The session has been paused.\n";
+      break;
+    default:
+      text += `Session reached state ${session.state}.\n`;
+  }
+
+  const prs = session.outputs
+    ?.map((o) => o.pullRequest)
+    .filter((pr): pr is NonNullable<typeof pr> => !!pr);
+  if (prs && prs.length > 0) {
+    text += "\nPull Request(s) Created:\n";
+    for (const pr of prs) {
+      text += `  - URL: ${pr.url}\n`;
+      text += `    Title: ${pr.title}\n`;
+      if (pr.number) text += `    Number: #${pr.number}\n`;
+    }
+  }
+
+  if (activities.activities && activities.activities.length > 0) {
+    text += `\nRecent Activities (${activities.activities.length}):\n`;
+    activities.activities.forEach((activity, index) => {
+      const originator = activity.originator ?? "unknown";
+      text += `  ${index + 1}. [${originator}] ${formatActivitySummary(activity)}\n`;
+    });
+  }
+
+  return text + formatStateGuidance(session);
+}
+
+export function formatWaitTimeout(
+  session: Session,
+  activities: ActivityList,
+  maxWaitSeconds: number
+): string {
+  let text = `Session Wait Time Limit Reached (${maxWaitSeconds}s)!\n\n`;
+  text += `Session ID: ${session.id}\n`;
+  text += `Current State: ${session.state}\n`;
+  text += `Title: ${session.title ?? "Untitled"}\n\n`;
+
+  text += `Instruction to LLM Client:\n`;
+  text += `The session did not reach a terminal state within the wait limit of ${maxWaitSeconds} seconds. `;
+  text += "However, Jules is still running asynchronously and no progress or work has been lost.\n";
+  text += `Please call "jules_wait_for_session" with sessionId "${session.id}" to resume polling and wait for completion.\n\n`;
+
+  if (activities.activities && activities.activities.length > 0) {
+    text += `Recent Activities (${activities.activities.length}):\n`;
+    activities.activities.forEach((activity, index) => {
+      const originator = activity.originator ?? "unknown";
+      text += `  ${index + 1}. [${originator}] ${formatActivitySummary(activity)}\n`;
+    });
+  }
+
+  return text;
 }
