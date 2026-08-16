@@ -5,6 +5,8 @@ import {
   formatSessionList,
   formatSessionOutput,
   formatSessionStatus,
+  formatWaitResolution,
+  formatWaitTimeout,
 } from "../../../src/resources/sessions/format.js";
 import { activityListFixture } from "../../fixtures/activities.js";
 import {
@@ -27,6 +29,20 @@ describe("formatSessionList", () => {
     expect(text).toContain("PR: https://github.com/acme/widget-app/pull/42");
     expect(text).toContain("PR: https://github.com/acme/widget-app/pull/18");
     expect(text).toContain(`pageToken: ${sessionListFixture.nextPageToken}`);
+  });
+
+  it("formats session list with untitled session", () => {
+    const listWithUntitled = {
+      sessions: [
+        {
+          id: "untitled-1",
+          prompt: "Do something",
+          state: "COMPLETED" as const,
+        },
+      ],
+    };
+    const text = formatSessionList(listWithUntitled);
+    expect(text).toContain("Untitled");
   });
 });
 
@@ -60,6 +76,25 @@ describe("formatSessionStatus", () => {
     const text = formatSessionStatus(sessionCompletedFixture, {});
     expect(text).toContain("Pull Request Created:");
     expect(text).toContain("https://github.com/acme/widget-app/pull/42");
+  });
+
+  it("formats session status with untitled session and pr without description", () => {
+    const sessionUntitledNoPrDesc = {
+      id: "untitled-2",
+      prompt: "Do something",
+      state: "COMPLETED" as const,
+      outputs: [
+        {
+          pullRequest: {
+            url: "https://github.com/acme/widget-app/pull/42",
+            title: "Add auth module unit tests",
+          },
+        },
+      ],
+    };
+    const text = formatSessionStatus(sessionUntitledNoPrDesc, {});
+    expect(text).toContain("Session: Untitled");
+    expect(text).not.toContain("Description:");
   });
 
   it("finds and includes pull request details when PR is at a non-zero index", () => {
@@ -130,5 +165,204 @@ describe("formatSessionOutput", () => {
     expect(text).toContain("Pull Request:");
     expect(text).toContain("Number: #18");
     expect(text).toContain("Review comments and fixes.");
+  });
+
+  it("renders both the pull request and the changeSet when a session's outputs contain both", () => {
+    const text = formatSessionOutput(sessionCompletedWithMultipleOutputsFixture);
+    expect(text).toContain("Pull Request:");
+    expect(text).toContain("Number: #18");
+    expect(text).toContain("Review comments and fixes.");
+    expect(text).toContain("Code Change:");
+    expect(text).toContain("Source: sources/github/acme/widget-app");
+    expect(text).toContain(
+      "Suggested commit message: Code Review: PR 17 (fix/encode-path-segments)"
+    );
+    expect(text).toContain("Diff:\n    diff --git a/foo b/foo");
+  });
+
+  it("renders code change details when only changeSet is present in outputs", () => {
+    const sessionWithChangeSet = {
+      id: "7777777777",
+      title: "Jules Code Review",
+      prompt: "Review the code change",
+      state: "COMPLETED" as const,
+      outputs: [
+        {
+          changeSet: {
+            source: "sources/github/acme/widget-app",
+            gitPatch: {
+              suggestedCommitMessage: "Fix path segmentation",
+              unidiffPatch: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1,3 +1,3 @@\n-old\n+new",
+            },
+          },
+        },
+      ],
+    };
+    const text = formatSessionOutput(sessionWithChangeSet);
+    expect(text).toContain("Code Change:");
+    expect(text).toContain("Source: sources/github/acme/widget-app");
+    expect(text).toContain("Suggested commit message: Fix path segmentation");
+    expect(text).toContain("Touched files:\n    - foo");
+    expect(text).toContain("Diff:\n    diff --git a/foo b/foo");
+  });
+
+  it("truncates the diff when it exceeds the character budget", () => {
+    const sessionWithHugeDiff = {
+      id: "8888888888",
+      title: "Jules Large Patch",
+      prompt: "Generate a large patch",
+      state: "COMPLETED" as const,
+      outputs: [
+        {
+          changeSet: {
+            source: "sources/github/acme/widget-app",
+            gitPatch: {
+              suggestedCommitMessage: "Fix lots of things",
+              unidiffPatch: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n" + "x".repeat(3000),
+            },
+          },
+        },
+      ],
+    };
+    const text = formatSessionOutput(sessionWithHugeDiff);
+    expect(text).toContain("Code Change:");
+    expect(text).toContain("chars omitted");
+    expect(text).toContain("re-requesting this activity will not recover it");
+  });
+});
+
+describe("formatWaitResolution and formatWaitTimeout", () => {
+  it("formats completed state with PR details and activities", () => {
+    const text = formatWaitResolution(sessionCompletedFixture, activityListFixture);
+    expect(text).toContain("Session Wait Resolved!");
+    expect(text).toContain("Final State: COMPLETED");
+    expect(text).toContain("Session completed successfully.");
+    expect(text).toContain("Pull Request(s) Created:");
+    expect(text).toContain("Recent Activities (7):");
+  });
+
+  it("formats completed state with PR without a number and with empty activities", () => {
+    const sessionWithNoPrNumber = {
+      ...sessionCompletedFixture,
+      outputs: [
+        {
+          pullRequest: {
+            url: "https://github.com/acme/widget-app/pull/42",
+            title: "Add auth module unit tests",
+          },
+        },
+      ],
+    };
+    const text = formatWaitResolution(sessionWithNoPrNumber, {});
+    expect(text).toContain("Session Wait Resolved!");
+    expect(text).not.toContain("Number:");
+    expect(text).not.toContain("Recent Activities");
+  });
+
+  it("formats completed state with activity missing originator", () => {
+    const activitiesWithNoOriginator = {
+      activities: [
+        {
+          name: "sessions/123/activities/a1",
+          description: "Something happened",
+        },
+      ],
+    };
+    const text = formatWaitResolution(sessionCompletedFixture, activitiesWithNoOriginator);
+    expect(text).toContain("[unknown]");
+  });
+
+  it("formats session output missing pull request description", () => {
+    const sessionNoPrDesc = {
+      ...sessionCompletedFixture,
+      outputs: [
+        {
+          pullRequest: {
+            url: "https://github.com/acme/widget-app/pull/42",
+            title: "Add auth module unit tests",
+          },
+        },
+      ],
+    };
+    const text = formatSessionOutput(sessionNoPrDesc);
+    expect(text).not.toContain("Description:");
+  });
+
+  it("formats session status with activity missing originator", () => {
+    const activitiesWithNoOriginator = {
+      activities: [
+        {
+          name: "sessions/123/activities/a1",
+          description: "Something happened",
+        },
+      ],
+    };
+    const text = formatSessionStatus(sessionCompletedFixture, activitiesWithNoOriginator);
+    expect(text).toContain("[unknown]");
+  });
+
+  it("formats failed state with reason", () => {
+    const failedActivities = {
+      activities: [
+        {
+          name: "sessions/123/activities/a1",
+          sessionFailed: { reason: "Cloud VM out of memory" },
+        },
+      ],
+    };
+    const text = formatWaitResolution(
+      { ...sessionCompletedFixture, state: "FAILED" as const },
+      failedActivities
+    );
+    expect(text).toContain("Final State: FAILED");
+    expect(text).toContain("Session failed. Reason: Cloud VM out of memory");
+  });
+
+  it("formats failed state with empty activities and empty outputs", () => {
+    const text = formatWaitResolution(
+      { ...sessionCompletedFixture, outputs: [], state: "FAILED" as const },
+      {}
+    );
+    expect(text).toContain("Final State: FAILED");
+    expect(text).not.toContain("Pull Request");
+    expect(text).not.toContain("Recent Activities");
+  });
+
+  it("formats other states like awaiting approval, user feedback, paused, default", () => {
+    const states = ["AWAITING_PLAN_APPROVAL", "AWAITING_USER_FEEDBACK", "PAUSED", "QUEUED"] as const;
+    for (const state of states) {
+      const text = formatWaitResolution(
+        { ...sessionCompletedFixture, state },
+        activityListFixture
+      );
+      expect(text).toContain(`Final State: ${state}`);
+    }
+  });
+
+  it("formats timeout details with activities", () => {
+    const text = formatWaitTimeout(sessionCompletedFixture, activityListFixture, 60);
+    expect(text).toContain("Session Wait Time Limit Reached (60s)!");
+    expect(text).toContain("Instruction to LLM Client:");
+    expect(text).toContain("Please call \"jules_wait_for_session\"");
+    expect(text).toContain("Recent Activities (7):");
+  });
+
+  it("formats timeout details with empty activities", () => {
+    const text = formatWaitTimeout(sessionCompletedFixture, {}, 60);
+    expect(text).toContain("Session Wait Time Limit Reached (60s)!");
+    expect(text).not.toContain("Recent Activities");
+  });
+
+  it("formats wait timeout with activities missing originator", () => {
+    const activitiesWithNoOriginator = {
+      activities: [
+        {
+          name: "sessions/123/activities/a1",
+          description: "Something happened",
+        },
+      ],
+    };
+    const text = formatWaitTimeout(sessionCompletedFixture, activitiesWithNoOriginator, 60);
+    expect(text).toContain("[unknown]");
   });
 });

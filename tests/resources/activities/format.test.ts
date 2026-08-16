@@ -4,6 +4,8 @@ import {
   formatActivityDetail,
   formatActivityList,
   formatActivitySummary,
+  formatChangeSet,
+  getTouchedFiles,
 } from "../../../src/resources/activities/format.js";
 import {
   activityAgentMessagedFixture,
@@ -71,6 +73,24 @@ describe("formatActivityDetail", () => {
     expect(text).toContain("Media (image/png)");
   });
 
+  it("renders ChangeSet details in artifact detail view", () => {
+    const text = formatActivityDetail(activityArtifactsFixture);
+    expect(text).toContain("Code change on sources/github/acme/widget-app:");
+    expect(text).toContain("Source: sources/github/acme/widget-app");
+    expect(text).toContain("Suggested commit message: Add auth tests");
+    expect(text).toContain("Touched files:\n    - foo");
+    expect(text).toContain("Diff:\n    diff --git a/foo b/foo");
+  });
+
+  it("renders ChangeSet details inside activity list item with correct indentation", () => {
+    const text = formatActivityList({ activities: [activityArtifactsFixture] }, "sess-123");
+    expect(text).toContain("   - Code change on sources/github/acme/widget-app:");
+    expect(text).toContain("     Source: sources/github/acme/widget-app");
+    expect(text).toContain("     Suggested commit message: Add auth tests");
+    expect(text).toContain("     Touched files:\n       - foo");
+    expect(text).toContain("     Diff:\n       diff --git a/foo b/foo");
+  });
+
   it("falls back to 'Activity occurred' when no variant is present", () => {
     expect(formatActivityDetail(activityNoVariantFixture)).toContain("Activity occurred");
   });
@@ -122,6 +142,25 @@ describe("formatActivityDetail", () => {
     const text = formatActivityDetail({ name: "a", sessionFailed: {} });
     expect(text).toContain("Session failed");
     expect(text).not.toContain("Reason:");
+  });
+
+  it("formats activity list with empty progress update details", () => {
+    const activityEmptyProgress = {
+      name: "sessions/123/activities/a1",
+      progressUpdated: {},
+    };
+    const text = formatActivityList({ activities: [activityEmptyProgress] }, "sess-1");
+    expect(text).toContain("Progress update\n");
+  });
+
+  it("formats activity list with empty plan steps", () => {
+    const activityWithEmptySteps = {
+      name: "sessions/123/activities/a1",
+      planGenerated: { plan: { steps: [] } },
+    };
+    const text = formatActivityList({ activities: [activityWithEmptySteps] }, "sess-1");
+    expect(text).toContain("Generated execution plan:");
+    expect(text).not.toContain("Steps:");
   });
 });
 
@@ -248,6 +287,85 @@ describe("output caps", () => {
     expect(text).toContain("chars omitted");
   });
 
+  it("truncates multiple large changeSet artifacts cleanly without garbling partial notes", () => {
+    const patch = "diff --git a/f b/f\n" + "x".repeat(3000);
+    const artifacts = Array.from({ length: 5 }, () => ({
+      changeSet: {
+        source: "sources/github/acme/widget-app",
+        gitPatch: { unidiffPatch: patch },
+      },
+    }));
+    const text = formatActivityDetail({
+      name: "sessions/s1/activities/a1",
+      artifacts,
+    });
+
+    expect(text.length).toBeLessThan(8250);
+    expect(text).toContain("chars omitted");
+    expect(text).not.toMatch(/\[\+\d+ chars omitted - this is the largest rendering available and no tool returns the remainder, so re-requesting this activity will not recover it\]\.\.\./);
+  });
+
+  it("strips partial note line when detail cut lands inside an existing omitted note", () => {
+    const patch2000 = "diff --git a/f b/f\n" + "x".repeat(5000);
+    const patch1307 = "diff --git a/f b/f\n" + "x".repeat(3500);
+
+    const artifacts = [
+      { changeSet: { gitPatch: { unidiffPatch: patch2000 } } },
+      { changeSet: { gitPatch: { unidiffPatch: patch2000 } } },
+      { changeSet: { gitPatch: { unidiffPatch: patch2000 } } },
+      { changeSet: { gitPatch: { unidiffPatch: patch1307 } } },
+    ];
+
+    const text = formatActivityDetail({
+      name: "sessions/s1/activities/a1",
+      artifacts,
+    });
+
+    expect(text.length).toBeLessThan(8250);
+    expect(text).toContain("chars omitted");
+  });
+
+  it("strips partial note line when list item cut lands inside an existing omitted note", () => {
+    const patch650 = "diff --git a/f b/f\n" + "x".repeat(2500);
+    const text = formatActivityList(
+      {
+        activities: [
+          {
+            name: "sessions/s1/activities/a1",
+            artifacts: [{ changeSet: { gitPatch: { unidiffPatch: patch650 } } }],
+          },
+        ],
+      },
+      "sess-1"
+    );
+
+    expect(text).toContain("use jules_get_activity");
+  });
+
+  it("truncates detail text when there are no newlines", () => {
+    const text = formatActivityDetail({
+      name: "a",
+      description: "x".repeat(10_000),
+    });
+    expect(text.length).toBeLessThan(8250);
+    expect(text).toContain("chars omitted");
+  });
+
+  it("truncates list item body when there are no newlines", () => {
+    const text = formatActivityList(
+      {
+        activities: [
+          {
+            name: "sessions/s1/activities/a1",
+            description: "x".repeat(2000),
+          },
+        ],
+      },
+      "sess-1"
+    );
+    expect(text).toContain("use jules_get_activity");
+  });
+
   it("tells the caller a capped detail response is terminal, not a page to follow", () => {
     const text = formatActivityDetail({
       name: "sessions/s1/activities/a1",
@@ -299,5 +417,58 @@ describe("output caps", () => {
     const text = formatActivityList(activityListFixture, "sess-1");
     expect(text).not.toContain("Showing");
     expect(text).not.toContain("use jules_get_activity");
+  });
+
+  it("parses touched files with non-standard prefix", () => {
+    const files = getTouchedFiles("--- foo.ts\n+++ bar.ts\n");
+    expect(files).toContain("foo.ts");
+    expect(files).toContain("bar.ts");
+  });
+});
+
+describe("formatChangeSet and getTouchedFiles edge cases", () => {
+  it("formats changeSet without source or gitPatch", () => {
+    expect(formatChangeSet({})).toBe("");
+  });
+
+  it("formats changeSet without suggestedCommitMessage or unidiffPatch", () => {
+    const text = formatChangeSet({ source: "src", gitPatch: {} });
+    expect(text).toContain("Source: src");
+    expect(text).not.toContain("Suggested commit message:");
+    expect(text).not.toContain("Diff:");
+  });
+
+  it("handles unidiffPatch with file additions/deletions and /dev/null", () => {
+    const patch =
+      "diff --git invalid_header\n" +
+      "--- /dev/null\n" +
+      "+++ b/added.ts\n" +
+      "--- a/deleted.ts\n" +
+      "+++ /dev/null\n" +
+      "--- \n" +
+      "+++ \n" +
+      "--- /dev/null\n" +
+      "+++ /dev/null\n";
+    const files = getTouchedFiles(patch);
+    expect(files).toContain("added.ts");
+    expect(files).toContain("deleted.ts");
+    expect(files).not.toContain("/dev/null");
+
+    const text = formatChangeSet({ gitPatch: { unidiffPatch: patch } });
+    expect(text).toContain("Touched files:\n  - added.ts\n  - deleted.ts");
+  });
+
+  it("formats empty diff lines correctly without trailing whitespace", () => {
+    const patch = "diff --git a/f b/f\n\n+line2";
+    const text = formatChangeSet({ gitPatch: { unidiffPatch: patch } }, "  ");
+    expect(text).toContain("  Diff:\n    diff --git a/f b/f\n\n    +line2\n");
+  });
+
+  it("formats changeSet artifact with missing source", () => {
+    const text = formatActivityDetail({
+      name: "a",
+      artifacts: [{ changeSet: {} }],
+    });
+    expect(text).toContain("Code change on unknown source:");
   });
 });
