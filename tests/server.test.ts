@@ -7,7 +7,7 @@ import { createServer, TOOL_NAMES, version } from "../src/server.js";
 const packageJson = createRequire(import.meta.url)("../package.json") as { version: string };
 
 describe("createServer", () => {
-  it("registers exactly the 13 documented tools", () => {
+  it("registers exactly the documented tools", () => {
     const registerSpy = vi.spyOn(McpServer.prototype, "registerTool");
 
     const server = createServer("test-key");

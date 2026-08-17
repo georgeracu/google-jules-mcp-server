@@ -5,6 +5,7 @@ import {
   formatSessionList,
   formatSessionOutput,
   formatSessionStatus,
+  formatStuckSessionList,
   formatWaitResolution,
   formatWaitTimeout,
 } from "../../../src/resources/sessions/format.js";
@@ -43,6 +44,33 @@ describe("formatSessionList", () => {
     };
     const text = formatSessionList(listWithUntitled);
     expect(text).toContain("Untitled");
+  });
+});
+
+describe("formatStuckSessionList", () => {
+  it("renders a clear message when there are no stuck sessions", () => {
+    expect(formatStuckSessionList({ sessions: [] })).toContain("No stuck sessions found");
+  });
+
+  it("formats the fields needed to act on a stuck session", () => {
+    const text = formatStuckSessionList({
+      sessions: [
+        {
+          id: "approval-1",
+          title: "Review authentication plan",
+          prompt: "Review the plan",
+          state: "AWAITING_PLAN_APPROVAL",
+          url: "https://jules.google.com/session/approval-1",
+          updateTime: "2026-08-17T08:00:00Z",
+        },
+      ],
+    });
+
+    expect(text).toContain("Review authentication plan");
+    expect(text).toContain("ID: approval-1");
+    expect(text).toContain("State: AWAITING_PLAN_APPROVAL");
+    expect(text).toContain("URL: https://jules.google.com/session/approval-1");
+    expect(text).toContain("Updated: 2026-08-17T08:00:00Z");
   });
 });
 

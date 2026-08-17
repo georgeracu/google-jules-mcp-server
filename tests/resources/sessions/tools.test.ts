@@ -81,6 +81,89 @@ describe("session tool handlers", () => {
     expect(result.isError).toBe(true);
   });
 
+  it("listStuckSessions reports when no sessions are stuck", async () => {
+    server.use(
+      http.get(`${BASE}/sessions`, () =>
+        HttpResponse.json({
+          sessions: [{ id: "running", title: "Running", prompt: "p", state: "IN_PROGRESS" }],
+        })
+      )
+    );
+
+    const result = await makeHandlers().listStuckSessions({ pageSize: 50 });
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain("No stuck sessions found");
+  });
+
+  it("listStuckSessions returns sessions awaiting action", async () => {
+    server.use(
+      http.get(`${BASE}/sessions`, () =>
+        HttpResponse.json({
+          sessions: [
+            {
+              id: "approval",
+              title: "Approve me",
+              prompt: "p",
+              state: "AWAITING_PLAN_APPROVAL",
+              url: "https://jules.google.com/session/approval",
+              updateTime: "2026-08-17T08:00:00Z",
+            },
+            {
+              id: "feedback",
+              title: "Reply to me",
+              prompt: "p",
+              state: "AWAITING_USER_FEEDBACK",
+              url: "https://jules.google.com/session/feedback",
+              updateTime: "2026-08-17T08:05:00Z",
+            },
+            { id: "done", title: "Done", prompt: "p", state: "COMPLETED" },
+          ],
+        })
+      )
+    );
+
+    const result = await makeHandlers().listStuckSessions({ pageSize: 50 });
+
+    expect(result.content[0].text).toContain("Stuck Jules sessions (2)");
+    expect(result.content[0].text).toContain("Approve me");
+    expect(result.content[0].text).toContain("Reply to me");
+    expect(result.content[0].text).not.toContain("Done");
+  });
+
+  it("listStuckSessions follows pagination past the first page", async () => {
+    const requestedTokens: Array<string | null> = [];
+    server.use(
+      http.get(`${BASE}/sessions`, ({ request }) => {
+        const url = new URL(request.url);
+        requestedTokens.push(url.searchParams.get("pageToken"));
+        expect(url.searchParams.get("pageSize")).toBe("25");
+
+        if (!url.searchParams.get("pageToken")) {
+          return HttpResponse.json({
+            sessions: [{ id: "running", prompt: "p", state: "IN_PROGRESS" }],
+            nextPageToken: "second-page",
+          });
+        }
+        return HttpResponse.json({
+          sessions: [
+            {
+              id: "feedback-on-page-two",
+              title: "Needs feedback",
+              prompt: "p",
+              state: "AWAITING_USER_FEEDBACK",
+            },
+          ],
+        });
+      })
+    );
+
+    const result = await makeHandlers().listStuckSessions({ pageSize: 25 });
+
+    expect(requestedTokens).toEqual([null, "second-page"]);
+    expect(result.content[0].text).toContain("Needs feedback");
+  });
+
   it("getStatus combines session and activities into one text result", async () => {
     const result = await makeHandlers().getStatus({
       sessionId: "1234567890",
@@ -201,7 +284,7 @@ describe("session tool handlers", () => {
 });
 
 describe("registerSessionTools", () => {
-  it("registers all 11 session tools with a working handler", async () => {
+  it("registers all 12 session tools with a working handler", async () => {
     const mcpServer = new McpServer({ name: "test", version: "0.0.0" });
     const registerSpy = vi.spyOn(mcpServer, "registerTool");
     const httpClient = new JulesHttpClient("test-key", BASE);
@@ -216,6 +299,7 @@ describe("registerSessionTools", () => {
     expect(names).toEqual([
       "jules_create_session",
       "jules_list_sessions",
+      "jules_list_stuck_sessions",
       "jules_get_status",
       "jules_send_message",
       "jules_approve_plan",
@@ -227,7 +311,7 @@ describe("registerSessionTools", () => {
       "jules_execute_and_wait",
     ]);
 
-    const getStatusHandler = registerSpy.mock.calls[2][2] as (args: object) => Promise<{
+    const getStatusHandler = registerSpy.mock.calls[3][2] as (args: object) => Promise<{
       content: Array<{ text: string }>;
     }>;
     const result = await getStatusHandler({ sessionId: "1234567890", includeActivities: 3 });
