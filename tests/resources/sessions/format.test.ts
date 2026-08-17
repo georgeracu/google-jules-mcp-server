@@ -192,7 +192,8 @@ describe("formatSessionOutput", () => {
             source: "sources/github/acme/widget-app",
             gitPatch: {
               suggestedCommitMessage: "Fix path segmentation",
-              unidiffPatch: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1,3 +1,3 @@\n-old\n+new",
+              unidiffPatch:
+                "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1,3 +1,3 @@\n-old\n+new",
             },
           },
         },
@@ -329,12 +330,14 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
   });
 
   it("formats other states like awaiting approval, user feedback, paused, default", () => {
-    const states = ["AWAITING_PLAN_APPROVAL", "AWAITING_USER_FEEDBACK", "PAUSED", "QUEUED"] as const;
+    const states = [
+      "AWAITING_PLAN_APPROVAL",
+      "AWAITING_USER_FEEDBACK",
+      "PAUSED",
+      "QUEUED",
+    ] as const;
     for (const state of states) {
-      const text = formatWaitResolution(
-        { ...sessionCompletedFixture, state },
-        activityListFixture
-      );
+      const text = formatWaitResolution({ ...sessionCompletedFixture, state }, activityListFixture);
       expect(text).toContain(`Final State: ${state}`);
     }
   });
@@ -343,7 +346,7 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
     const text = formatWaitTimeout(sessionCompletedFixture, activityListFixture, 60);
     expect(text).toContain("Session Wait Time Limit Reached (60s)!");
     expect(text).toContain("Instruction to LLM Client:");
-    expect(text).toContain("Please call \"jules_wait_for_session\"");
+    expect(text).toContain('Please call "jules_wait_for_session"');
     expect(text).toContain("Recent Activities (7):");
   });
 

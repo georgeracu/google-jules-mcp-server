@@ -69,7 +69,8 @@ export const sessionCompletedWithMultipleOutputsFixture = {
         gitPatch: {
           baseCommitId: "abc123",
           suggestedCommitMessage: "Code Review: PR 17 (fix/encode-path-segments)",
-          unidiffPatch: "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1,3 +1,3 @@\n-old line\n+new line",
+          unidiffPatch:
+            "diff --git a/foo b/foo\n--- a/foo\n+++ b/foo\n@@ -1,3 +1,3 @@\n-old line\n+new line",
         },
       },
     },

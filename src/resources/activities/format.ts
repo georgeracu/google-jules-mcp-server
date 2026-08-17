@@ -64,8 +64,7 @@ export function formatChangeSet(
       if (diffText.length > CHANGE_SET_DIFF_CHAR_BUDGET) {
         const omitted = diffText.length - CHANGE_SET_DIFF_CHAR_BUDGET;
         diffText =
-          diffText.slice(0, CHANGE_SET_DIFF_CHAR_BUDGET) +
-          `...\n${formatOmittedNote(omitted)}`;
+          diffText.slice(0, CHANGE_SET_DIFF_CHAR_BUDGET) + `...\n${formatOmittedNote(omitted)}`;
       }
       const indentedDiff = diffText
         .split("\n")
