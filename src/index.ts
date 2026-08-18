@@ -5,8 +5,16 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { getApiKey } from "./core/config.js";
 import { logger } from "./core/logger.js";
 import { createServer, TOOL_NAMES } from "./server.js";
+import { startWatcher } from "./watch.js";
 
 async function main(): Promise<void> {
+  const isWatcher = process.argv[2] === "watch";
+
+  if (isWatcher) {
+    await startWatcher();
+    return;
+  }
+
   const apiKey = getApiKey();
   const server = createServer(apiKey);
 
