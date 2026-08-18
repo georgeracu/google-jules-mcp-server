@@ -96,6 +96,14 @@ describe("session tool handlers", () => {
     expect(result.content[0].text).toContain("No stuck sessions found");
   });
 
+  it("listStuckSessions handles a response without a sessions array", async () => {
+    server.use(http.get(`${BASE}/sessions`, () => HttpResponse.json({})));
+
+    const result = await makeHandlers().listStuckSessions({ pageSize: 50 });
+
+    expect(result.content[0].text).toContain("No stuck sessions found");
+  });
+
   it("listStuckSessions returns sessions awaiting action", async () => {
     server.use(
       http.get(`${BASE}/sessions`, () =>
