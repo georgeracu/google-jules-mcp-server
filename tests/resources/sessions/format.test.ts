@@ -72,6 +72,22 @@ describe("formatStuckSessionList", () => {
     expect(text).toContain("URL: https://jules.google.com/session/approval-1");
     expect(text).toContain("Updated: 2026-08-17T08:00:00Z");
   });
+
+  it("uses fallbacks for missing stuck-session display fields", () => {
+    const text = formatStuckSessionList({
+      sessions: [
+        {
+          id: "approval-2",
+          prompt: "Review the plan",
+          state: "AWAITING_PLAN_APPROVAL",
+        },
+      ],
+    });
+
+    expect(text).toContain("Untitled");
+    expect(text).toContain("URL: unknown");
+    expect(text).toContain("Updated: unknown");
+  });
 });
 
 describe("formatSessionCreated", () => {

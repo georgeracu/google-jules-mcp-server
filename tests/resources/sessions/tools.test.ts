@@ -164,6 +164,59 @@ describe("session tool handlers", () => {
     expect(result.content[0].text).toContain("Needs feedback");
   });
 
+  it("listStuckSessions returns an error when the API request fails", async () => {
+    server.use(
+      http.get(`${BASE}/sessions`, () =>
+        HttpResponse.json({ error: { message: "temporarily unavailable" } }, { status: 503 })
+      )
+    );
+
+    const result = await makeHandlers().listStuckSessions({ pageSize: 50 });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("Error listing stuck sessions");
+  });
+
+  it("listStuckSessions stops after scanning 500 sessions", async () => {
+    let requests = 0;
+    server.use(
+      http.get(`${BASE}/sessions`, () => {
+        requests++;
+        return HttpResponse.json({
+          sessions: Array.from({ length: 500 }, (_, index) => ({
+            id: `running-${index}`,
+            prompt: "p",
+            state: "IN_PROGRESS",
+          })),
+          nextPageToken: "should-not-be-fetched",
+        });
+      })
+    );
+
+    const result = await makeHandlers().listStuckSessions({ pageSize: 500 });
+
+    expect(requests).toBe(1);
+    expect(result.content[0].text).toContain("No stuck sessions found");
+  });
+
+  it("listStuckSessions stops after five pages", async () => {
+    let requests = 0;
+    server.use(
+      http.get(`${BASE}/sessions`, () => {
+        requests++;
+        return HttpResponse.json({
+          sessions: [{ id: `running-${requests}`, prompt: "p", state: "IN_PROGRESS" }],
+          nextPageToken: `page-${requests + 1}`,
+        });
+      })
+    );
+
+    const result = await makeHandlers().listStuckSessions({ pageSize: 1 });
+
+    expect(requests).toBe(5);
+    expect(result.content[0].text).toContain("No stuck sessions found");
+  });
+
   it("getStatus combines session and activities into one text result", async () => {
     const result = await makeHandlers().getStatus({
       sessionId: "1234567890",
