@@ -258,7 +258,10 @@ describe("jules_wait_for_session and jules_execute_and_wait", () => {
     let capturedBody: { requirePlanApproval?: boolean; automationMode?: string } | undefined;
     server.use(
       http.post(`${BASE}/sessions`, async ({ request }) => {
-        capturedBody = (await request.json()) as { requirePlanApproval?: boolean; automationMode?: string };
+        capturedBody = (await request.json()) as {
+          requirePlanApproval?: boolean;
+          automationMode?: string;
+        };
         return HttpResponse.json({ id: "created-456", prompt: "p", state: "QUEUED" });
       }),
       http.get(`${BASE}/sessions/created-456`, () =>
@@ -326,7 +329,7 @@ describe("jules_wait_for_session and jules_execute_and_wait", () => {
     const result = await promise;
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toContain("Session Wait Time Limit Reached");
-    expect(result.content[0].text).toContain("Please call \"jules_wait_for_session\"");
+    expect(result.content[0].text).toContain('Please call "jules_wait_for_session"');
     vi.useRealTimers();
   });
 
