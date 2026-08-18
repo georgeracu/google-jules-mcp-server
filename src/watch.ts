@@ -54,7 +54,7 @@ export async function pollStuckSessions(
 
           if (!response.ok) {
             logger.error(`Webhook failed with status ${response.status} ${response.statusText}`);
-          } else {
+          } else if (session.state) {
             // Only update seen states if webhook succeeded, so we retry on failure
             seenStates.set(session.id, session.state);
           }
