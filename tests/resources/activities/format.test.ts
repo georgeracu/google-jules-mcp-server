@@ -302,7 +302,9 @@ describe("output caps", () => {
 
     expect(text.length).toBeLessThan(8250);
     expect(text).toContain("chars omitted");
-    expect(text).not.toMatch(/\[\+\d+ chars omitted - this is the largest rendering available and no tool returns the remainder, so re-requesting this activity will not recover it\]\.\.\./);
+    expect(text).not.toMatch(
+      /\[\+\d+ chars omitted - this is the largest rendering available and no tool returns the remainder, so re-requesting this activity will not recover it\]\.\.\./
+    );
   });
 
   it("strips partial note line when detail cut lands inside an existing omitted note", () => {

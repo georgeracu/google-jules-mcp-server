@@ -8,11 +8,13 @@ labels: bug
 What happened, and what did you expect instead?
 
 **Steps to reproduce**
+
 1.
 2.
 3.
 
 **Environment**
+
 - `google-jules-mcp-server` version:
 - Node.js version:
 - MCP client (Claude Desktop, Claude Code, other):
