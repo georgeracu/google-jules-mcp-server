@@ -42,7 +42,7 @@ export const SessionSchema = z.object({
   id: z.string(),
   title: z.string().optional(),
   prompt: z.string(),
-  state: SessionStateSchema,
+  state: SessionStateSchema.optional(),
   sourceContext: SourceContextSchema.optional(),
   createTime: z.string().optional(),
   updateTime: z.string().optional(),
