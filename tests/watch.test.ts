@@ -101,7 +101,7 @@ describe("watcher", () => {
               title: "Failing webhook session",
               prompt: "test prompt",
               url: "https://jules.google.com/session-fail",
-            }
+            },
           ],
         });
       })
@@ -133,7 +133,7 @@ describe("watcher", () => {
               title: "Throwing webhook session",
               prompt: "test prompt",
               url: "https://jules.google.com/session-throw",
-            }
+            },
           ],
         });
       })
@@ -170,7 +170,9 @@ describe("watcher", () => {
       process.env.JULES_API_KEY = "fake-key";
       delete process.env.JULES_WATCH_WEBHOOK_URL;
       const { startWatcher } = await import("../src/watch.js");
-      await expect(startWatcher()).rejects.toThrow("JULES_WATCH_WEBHOOK_URL environment variable is required");
+      await expect(startWatcher()).rejects.toThrow(
+        "JULES_WATCH_WEBHOOK_URL environment variable is required"
+      );
     });
 
     it("throws if JULES_WATCH_INTERVAL_SECONDS is invalid", async () => {
@@ -192,10 +194,16 @@ describe("watcher", () => {
         })
       );
 
+      const { vi } = await import("vitest");
+      vi.useFakeTimers();
+
       const { startWatcher } = await import("../src/watch.js");
       const promise = startWatcher();
       // Should hang indefinitely, so we just expect it to be a promise that doesn't reject immediately
       expect(promise).toBeInstanceOf(Promise);
+
+      vi.clearAllTimers();
+      vi.useRealTimers();
     });
   });
 });

@@ -12,7 +12,6 @@ async function main(): Promise<void> {
 
   if (isWatcher) {
     await startWatcher();
-    return;
   }
 
   const apiKey = getApiKey();
