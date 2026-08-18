@@ -199,25 +199,28 @@ Restart your client after editing its config.
 
 ### 4. Verify
 
-Ask your assistant: "List my Jules repositories." You should see the `jules` server connected with 13 tools available.
+Ask your assistant: "List my Jules repositories." You should see the `jules` server connected with 16 tools available.
 
 ## Available Tools
 
-| Tool                       | Purpose                                                                 |
-| -------------------------- | ----------------------------------------------------------------------- |
-| `jules_list_sources`       | List GitHub repositories connected to Jules                             |
-| `jules_get_source`         | Get details (branches, visibility) for one connected repository         |
-| `jules_create_session`     | Start a new asynchronous coding task                                    |
-| `jules_list_sessions`      | List sessions and their states                                          |
-| `jules_get_status`         | Check a session's status and recent activity                            |
-| `jules_send_message`       | Send a follow-up instruction to a running session                       |
-| `jules_approve_plan`       | Approve a session's execution plan (when `requirePlanApproval` was set) |
-| `jules_get_session_output` | Retrieve the final output (PR details) of a completed session           |
-| `jules_delete_session`     | Permanently delete a session                                            |
-| `jules_archive_session`    | Archive a session without deleting it                                   |
-| `jules_unarchive_session`  | Restore an archived session                                             |
-| `jules_list_activities`    | Get a session's detailed activity log                                   |
-| `jules_get_activity`       | Get a single activity by ID                                             |
+| Tool                        | Purpose                                                                                   |
+| --------------------------- | ----------------------------------------------------------------------------------------- |
+| `jules_list_sources`        | List GitHub repositories connected to Jules                                               |
+| `jules_get_source`          | Get details (branches, visibility) for one connected repository                           |
+| `jules_create_session`      | Start a new asynchronous coding task                                                      |
+| `jules_list_sessions`       | List sessions and their states                                                            |
+| `jules_list_stuck_sessions` | List sessions awaiting plan approval or user feedback, following pagination automatically |
+| `jules_get_status`          | Check a session's status and recent activity                                              |
+| `jules_send_message`        | Send a follow-up instruction to a running session                                         |
+| `jules_approve_plan`        | Approve a session's execution plan (when `requirePlanApproval` was set)                   |
+| `jules_get_session_output`  | Retrieve the final output (PR details) of a completed session                             |
+| `jules_delete_session`      | Permanently delete a session                                                              |
+| `jules_archive_session`     | Archive a session without deleting it                                                     |
+| `jules_unarchive_session`   | Restore an archived session                                                               |
+| `jules_wait_for_session`    | Wait/poll for a session to reach a terminal state                                         |
+| `jules_execute_and_wait`    | Create a session and wait for it to complete in one call                                  |
+| `jules_list_activities`     | Get a session's detailed activity log                                                     |
+| `jules_get_activity`        | Get a single activity by ID                                                               |
 
 ## Output Size and Pagination
 

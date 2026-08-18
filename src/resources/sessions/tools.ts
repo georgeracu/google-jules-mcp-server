@@ -11,10 +11,11 @@ import {
   formatSessionList,
   formatSessionOutput,
   formatSessionStatus,
+  formatStuckSessionList,
   formatWaitResolution,
   formatWaitTimeout,
 } from "./format.js";
-import { CreateSessionRequestSchema, type CreateSessionRequest } from "./schemas.js";
+import { CreateSessionRequestSchema, type CreateSessionRequest, type Session } from "./schemas.js";
 
 interface WaitExtra {
   signal?: AbortSignal;
@@ -224,6 +225,34 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
       }
     },
 
+    listStuckSessions: async ({ pageSize }: { pageSize: number }): Promise<ToolResult> => {
+      try {
+        const stuckSessions: Session[] = [];
+        let sessionsScanned = 0;
+        let pageToken: string | undefined;
+
+        for (let page = 0; page < 5 && sessionsScanned < 500; page++) {
+          const data = await sessions.listSessions({ pageSize, pageToken });
+          const pageSessions = (data.sessions ?? []).slice(0, 500 - sessionsScanned);
+          sessionsScanned += pageSessions.length;
+          stuckSessions.push(
+            ...pageSessions.filter(
+              (session) =>
+                session.state === "AWAITING_PLAN_APPROVAL" ||
+                session.state === "AWAITING_USER_FEEDBACK"
+            )
+          );
+
+          pageToken = data.nextPageToken;
+          if (!pageToken) break;
+        }
+
+        return textResult(formatStuckSessionList({ sessions: stuckSessions }));
+      } catch (error) {
+        return errorResult(`Error listing stuck sessions: ${formatErrorForUser(error)}`);
+      }
+    },
+
     getStatus: async ({
       sessionId,
       includeActivities,
@@ -362,6 +391,22 @@ export function registerSessionTools(
       },
     },
     handlers.listSessions
+  );
+
+  server.registerTool(
+    "jules_list_stuck_sessions",
+    {
+      title: "List Stuck Jules Sessions",
+      description:
+        "List sessions that are waiting for plan approval or user feedback, following pagination automatically.",
+      inputSchema: {
+        pageSize: z
+          .number()
+          .default(50)
+          .describe("Number of sessions to fetch per page (default: 50)"),
+      },
+    },
+    handlers.listStuckSessions
   );
 
   server.registerTool(

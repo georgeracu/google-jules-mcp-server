@@ -27,6 +27,25 @@ export function formatSessionList(data: SessionList): string {
   return response;
 }
 
+export function formatStuckSessionList(data: SessionList): string {
+  if (!data.sessions || data.sessions.length === 0) {
+    return "No stuck sessions found. No sessions are awaiting plan approval or user feedback.";
+  }
+
+  const sessionsList = data.sessions
+    .map(
+      (session, index) =>
+        `${index + 1}. ${session.title ?? "Untitled"}\n` +
+        `   ID: ${session.id}\n` +
+        `   State: ${session.state}\n` +
+        `   URL: ${session.url ?? "unknown"}\n` +
+        `   Updated: ${session.updateTime ?? "unknown"}`
+    )
+    .join("\n\n");
+
+  return `Stuck Jules sessions (${data.sessions.length}):\n\n${sessionsList}`;
+}
+
 export function formatSessionCreated(
   session: Session,
   params: {
