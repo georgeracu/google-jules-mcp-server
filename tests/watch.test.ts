@@ -208,7 +208,7 @@ describe("watcher", () => {
       );
 
       // Wait for the initial poll to complete
-      await new Promise(process.nextTick);
+      await new Promise((resolve) => process.nextTick(resolve));
 
       // Fast-forward interval
       await vi.runOnlyPendingTimersAsync();
