@@ -199,6 +199,20 @@ describe("watcher", () => {
 
       const { startWatcher } = await import("../src/watch.js");
       const promise = startWatcher();
+
+      // Advance timers to trigger the catch block inside setInterval for codecov
+      server.use(
+        http.get(`${JULES_API_BASE}/sessions`, () => {
+          return HttpResponse.error();
+        })
+      );
+
+      // Wait for the initial poll to complete
+      await new Promise(process.nextTick);
+
+      // Fast-forward interval
+      await vi.runOnlyPendingTimersAsync();
+
       // Should hang indefinitely, so we just expect it to be a promise that doesn't reject immediately
       expect(promise).toBeInstanceOf(Promise);
 
