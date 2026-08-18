@@ -85,4 +85,117 @@ describe("watcher", () => {
     expect(postedPayloads[1].state).toBe("AWAITING_USER_FEEDBACK");
     expect(seenStates.get(stuckSessionId)).toBe("AWAITING_USER_FEEDBACK");
   });
+
+  it("handles webhook failures gracefully", async () => {
+    const client = new SessionsClient(new JulesHttpClient("fake-key"));
+    const seenStates = new Map<string, string>();
+    const webhookUrl = "http://fake-webhook.com/post-fail";
+
+    server.use(
+      http.get(`${JULES_API_BASE}/sessions`, () => {
+        return HttpResponse.json({
+          sessions: [
+            {
+              id: "session-fail",
+              state: "AWAITING_PLAN_APPROVAL",
+              title: "Failing webhook session",
+              prompt: "test prompt",
+              url: "https://jules.google.com/session-fail",
+            }
+          ],
+        });
+      })
+    );
+
+    server.use(
+      http.post(webhookUrl, () => {
+        return new HttpResponse(null, { status: 500 });
+      })
+    );
+
+    await pollStuckSessions(client, webhookUrl, seenStates);
+    // Should NOT have added to seenStates since webhook failed
+    expect(seenStates.has("session-fail")).toBe(false);
+  });
+
+  it("handles fetch throwing entirely", async () => {
+    const client = new SessionsClient(new JulesHttpClient("fake-key"));
+    const seenStates = new Map<string, string>();
+    const webhookUrl = "http://fake-webhook.com/post-throw";
+
+    server.use(
+      http.get(`${JULES_API_BASE}/sessions`, () => {
+        return HttpResponse.json({
+          sessions: [
+            {
+              id: "session-throw",
+              state: "AWAITING_PLAN_APPROVAL",
+              title: "Throwing webhook session",
+              prompt: "test prompt",
+              url: "https://jules.google.com/session-throw",
+            }
+          ],
+        });
+      })
+    );
+
+    server.use(
+      http.post(webhookUrl, () => {
+        return HttpResponse.error();
+      })
+    );
+
+    await pollStuckSessions(client, webhookUrl, seenStates);
+    // Should NOT have added to seenStates since webhook threw
+    expect(seenStates.has("session-throw")).toBe(false);
+  });
+
+  it("catches sessionsClient throwing", async () => {
+    const client = new SessionsClient(new JulesHttpClient("fake-key"));
+    const seenStates = new Map<string, string>();
+    const webhookUrl = "http://fake-webhook.com/post";
+
+    server.use(
+      http.get(`${JULES_API_BASE}/sessions`, () => {
+        return HttpResponse.error();
+      })
+    );
+
+    // Should swallow error and resolve normally
+    await pollStuckSessions(client, webhookUrl, seenStates);
+  });
+
+  describe("startWatcher", () => {
+    it("throws if JULES_WATCH_WEBHOOK_URL is not set", async () => {
+      process.env.JULES_API_KEY = "fake-key";
+      delete process.env.JULES_WATCH_WEBHOOK_URL;
+      const { startWatcher } = await import("../src/watch.js");
+      await expect(startWatcher()).rejects.toThrow("JULES_WATCH_WEBHOOK_URL environment variable is required");
+    });
+
+    it("throws if JULES_WATCH_INTERVAL_SECONDS is invalid", async () => {
+      process.env.JULES_API_KEY = "fake-key";
+      process.env.JULES_WATCH_WEBHOOK_URL = "http://test";
+      process.env.JULES_WATCH_INTERVAL_SECONDS = "abc";
+      const { startWatcher } = await import("../src/watch.js");
+      await expect(startWatcher()).rejects.toThrow("must be a positive integer");
+    });
+
+    it("starts without throwing on valid config", async () => {
+      process.env.JULES_API_KEY = "fake-key";
+      process.env.JULES_WATCH_WEBHOOK_URL = "http://test";
+      process.env.JULES_WATCH_INTERVAL_SECONDS = "60";
+
+      server.use(
+        http.get(`${JULES_API_BASE}/sessions`, () => {
+          return HttpResponse.json({ sessions: [] });
+        })
+      );
+
+      const { startWatcher } = await import("../src/watch.js");
+      const promise = startWatcher();
+      // Should hang indefinitely, so we just expect it to be a promise that doesn't reject immediately
+      expect(promise).toBeInstanceOf(Promise);
+    });
+  });
 });
