@@ -247,6 +247,88 @@ Pagination itself is unaffected by any of this. `jules_list_sources`, `jules_lis
 
 Your assistant handles this polling loop automatically when asked to monitor a task.
 
+### Session Watcher (Stuck Sessions)
+
+If you don't want your LLM client burning tokens polling for stuck sessions (e.g. `AWAITING_PLAN_APPROVAL` or `AWAITING_USER_FEEDBACK`), you can run the standalone session watcher. It runs independently of any MCP client and posts a JSON payload to a webhook when a session gets stuck.
+
+**Required environment variables:**
+
+- `JULES_API_KEY`: Your Jules API key.
+- `JULES_WATCH_WEBHOOK_URL`: The URL to POST the JSON payload to.
+
+**Optional environment variables:**
+
+- `JULES_WATCH_INTERVAL_SECONDS`: The polling interval in seconds (default: `60`).
+
+The payload structure:
+
+```json
+{
+  "id": "session_id_here",
+  "title": "Session Title",
+  "state": "AWAITING_PLAN_APPROVAL",
+  "url": "https://jules.google.com/session_url"
+}
+```
+
+**Running the watcher:**
+
+_Via npx:_
+
+```bash
+JULES_API_KEY=your_key JULES_WATCH_WEBHOOK_URL=https://hooks.slack.com/services/... npx -y google-jules-mcp-server watch
+```
+
+_Via local clone:_
+
+```bash
+JULES_API_KEY=your_key JULES_WATCH_WEBHOOK_URL=https://hooks.slack.com/services/... node build/index.js watch
+```
+
+_Example PM2 configuration (`ecosystem.config.js`):_
+
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: "jules-watcher",
+      script: "npx",
+      args: "google-jules-mcp-server watch",
+      env: {
+        JULES_API_KEY: "your_key",
+        JULES_WATCH_WEBHOOK_URL: "https://your.webhook.url/here",
+        JULES_WATCH_INTERVAL_SECONDS: "60",
+      },
+    },
+  ],
+};
+```
+
+_Example systemd service (`/etc/systemd/system/jules-watcher.service`):_
+
+```ini
+[Unit]
+Description=Jules Session Watcher
+
+[Service]
+ExecStart=/usr/bin/npx google-jules-mcp-server watch
+Environment="JULES_API_KEY=your_key"
+Environment="JULES_WATCH_WEBHOOK_URL=https://your.webhook.url/here"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+_Example Docker one-liner:_
+
+```bash
+docker run -d --name jules-watcher \
+  -e JULES_API_KEY=your_key \
+  -e JULES_WATCH_WEBHOOK_URL=https://your.webhook.url/here \
+  node:22 npx -y google-jules-mcp-server watch
+```
+
 ## Rate Limits and Quotas
 
 Jules enforces task quotas based on subscription tier (Free: 15 daily / 3 concurrent; Google AI Pro: ~75 daily / 15 concurrent; Google AI Ultra: ~300 daily / 60 concurrent). Tasks count against quota even if they fail, on a rolling 24-hour window.
