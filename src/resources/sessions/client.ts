@@ -13,10 +13,12 @@ export class SessionsClient {
   constructor(private readonly http: JulesHttpClient) {}
 
   createSession(request: CreateSessionRequest): Promise<Session> {
-    return this.http.request("/sessions", SessionSchema, {
-      method: "POST",
-      body: JSON.stringify(request),
-    });
+    return this.http
+      .request("/sessions", SessionSchema, {
+        method: "POST",
+        body: JSON.stringify(request),
+      })
+      .then((session) => ({ ...session, state: session.state ?? "QUEUED" }));
   }
 
   listSessions(params: { pageSize?: number; pageToken?: string }): Promise<SessionList> {

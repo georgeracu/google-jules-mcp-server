@@ -65,7 +65,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         "AWAITING_PLAN_APPROVAL",
         "AWAITING_USER_FEEDBACK",
         "PAUSED",
-      ].includes(session.state);
+      ].includes(session.state ?? "STATE_UNSPECIFIED");
 
       const elapsedMs = Date.now() - start;
       const isTimeout = elapsedMs >= maxWaitMs;

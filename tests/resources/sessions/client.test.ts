@@ -32,6 +32,23 @@ describe("SessionsClient", () => {
     expect(capturedBody).toEqual(request);
   });
 
+  it("createSession defaults the state when the API omits it", async () => {
+    server.use(
+      http.post(`${BASE}/sessions`, () => {
+        const response: Record<string, unknown> = { ...sessionCompletedFixture };
+        delete response.state;
+        return HttpResponse.json(response);
+      })
+    );
+
+    const result = await makeClient().createSession({
+      prompt: "do the thing",
+      sourceContext: { source: "sources/github/acme/widget-app" },
+    });
+
+    expect(result.state).toBe("QUEUED");
+  });
+
   it("listSessions sends pageSize/pageToken as query params", async () => {
     let capturedUrl: string | undefined;
     server.use(
