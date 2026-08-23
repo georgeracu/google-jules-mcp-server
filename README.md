@@ -4,6 +4,7 @@
 [![codecov](https://codecov.io/gh/georgeracu/google-jules-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/georgeracu/google-jules-mcp-server)
 [![npm version](https://img.shields.io/npm/v/google-jules-mcp-server.svg)](https://www.npmjs.com/package/google-jules-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-google--jules--mcp--server-blue)](https://registry.modelcontextprotocol.io/?search=google-jules-mcp-server)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/georgeracu/google-jules-mcp-server)
 
 If you're searching for a way to drive Google's Jules coding agent from Claude, Cursor, VS Code Copilot, or any other MCP client, this is that bridge. `google-jules-mcp-server` is an unofficial Model Context Protocol server that exposes the full Jules API (v1alpha) as 13 tools, so your assistant can create sessions, poll status, approve plans, and fetch the resulting pull request without you leaving the chat.
 
