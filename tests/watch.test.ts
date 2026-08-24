@@ -118,6 +118,36 @@ describe("watcher", () => {
     expect(seenStates.has("session-fail")).toBe(false);
   });
 
+  it("notifies again when a session leaves and re-enters a stuck state", async () => {
+    const client = new SessionsClient(new JulesHttpClient("fake-key"));
+    const seenStates = new Map<string, string>();
+    const webhookUrl = "http://fake-webhook.com/post-reentry";
+    let state = "AWAITING_PLAN_APPROVAL";
+    let notificationCount = 0;
+
+    server.use(
+      http.get(`${JULES_API_BASE}/sessions`, () =>
+        HttpResponse.json({
+          sessions: [{ id: "session-reentry", state, prompt: "test prompt" }],
+        })
+      ),
+      http.post(webhookUrl, () => {
+        notificationCount += 1;
+        return new HttpResponse(null, { status: 200 });
+      })
+    );
+
+    await pollStuckSessions(client, webhookUrl, seenStates);
+    expect(notificationCount).toBe(1);
+
+    state = "IN_PROGRESS";
+    await pollStuckSessions(client, webhookUrl, seenStates);
+
+    state = "AWAITING_PLAN_APPROVAL";
+    await pollStuckSessions(client, webhookUrl, seenStates);
+    expect(notificationCount).toBe(2);
+  });
+
   it("handles fetch throwing entirely", async () => {
     const client = new SessionsClient(new JulesHttpClient("fake-key"));
     const seenStates = new Map<string, string>();
