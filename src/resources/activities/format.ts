@@ -27,8 +27,6 @@ const LIST_ITEM_CHAR_BUDGET = 800;
 const LIST_PAGE_CHAR_BUDGET = 10_000;
 const DETAIL_CHAR_BUDGET = 8_000;
 const CHANGE_SET_DIFF_CHAR_BUDGET = 2_000;
-/** Below this the recovery hint costs more than the cut saves, so leave the item whole. */
-const LIST_ITEM_SLACK = 150;
 const UNKNOWN_ACTIVITY_TEXT = "Activity occurred";
 
 function formatOmittedNote(omitted: number): string {
@@ -281,7 +279,7 @@ function listItemText(activity: Activity, index: number): string {
  */
 function formatActivityListItem(activity: Activity, index: number, sessionId: string): string {
   const body = listItemText(activity, index);
-  if (body.length <= LIST_ITEM_CHAR_BUDGET + LIST_ITEM_SLACK) return body;
+  if (body.length <= LIST_ITEM_CHAR_BUDGET) return body;
 
   const omitted = body.length - LIST_ITEM_CHAR_BUDGET;
   return (
