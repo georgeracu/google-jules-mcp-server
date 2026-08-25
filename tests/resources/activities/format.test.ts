@@ -265,6 +265,18 @@ describe("output caps", () => {
     expect(text).not.toContain("from-name");
   });
 
+  it("leaves an entry inside the item budget whole rather than inflating it with a hint", () => {
+    const text = listOne({ agentMessaged: { agentMessage: longText(700) } });
+    expect(text).toContain(longText(700));
+    expect(text).not.toContain("use jules_get_activity");
+  });
+
+  it("caps an entry once past the item budget", () => {
+    expect(listOne({ agentMessaged: { agentMessage: longText(900) } })).toContain(
+      "use jules_get_activity"
+    );
+  });
+
   it("caps the detail path, including a plan carrying hundreds of steps", () => {
     const steps = Array.from({ length: 2000 }, (_, i) => ({ title: `step ${i}` }));
     const text = formatActivityDetail({
