@@ -23,12 +23,8 @@ export function getTouchedFiles(patch: string): string[] {
 }
 
 const SUMMARY_CHAR_BUDGET = 100;
-const LIST_ITEM_CHAR_BUDGET = 800;
-const LIST_PAGE_CHAR_BUDGET = 10_000;
+const ITEM_CHAR_BUDGET = 800;
 const DETAIL_CHAR_BUDGET = 8_000;
-const CHANGE_SET_DIFF_CHAR_BUDGET = 2_000;
-/** Below this the recovery hint costs more than the cut saves, so leave the item whole. */
-const LIST_ITEM_SLACK = 150;
 const UNKNOWN_ACTIVITY_TEXT = "Activity occurred";
 
 function formatOmittedNote(omitted: number): string {
@@ -61,10 +57,9 @@ export function formatChangeSet(
       }
       res += `${indent}Diff:\n`;
       let diffText = patch.unidiffPatch;
-      if (diffText.length > CHANGE_SET_DIFF_CHAR_BUDGET) {
-        const omitted = diffText.length - CHANGE_SET_DIFF_CHAR_BUDGET;
-        diffText =
-          diffText.slice(0, CHANGE_SET_DIFF_CHAR_BUDGET) + `...\n${formatOmittedNote(omitted)}`;
+      if (diffText.length > ITEM_CHAR_BUDGET) {
+        const omitted = diffText.length - ITEM_CHAR_BUDGET;
+        diffText = diffText.slice(0, ITEM_CHAR_BUDGET) + `...\n${formatOmittedNote(omitted)}`;
       }
       const indentedDiff = diffText
         .split("\n")
@@ -245,11 +240,11 @@ function listItemText(activity: Activity, index: number): string {
  */
 function formatActivityListItem(activity: Activity, index: number, sessionId: string): string {
   const body = listItemText(activity, index);
-  if (body.length <= LIST_ITEM_CHAR_BUDGET + LIST_ITEM_SLACK) return body;
+  if (body.length <= ITEM_CHAR_BUDGET) return body;
 
-  const omitted = body.length - LIST_ITEM_CHAR_BUDGET;
+  const omitted = body.length - ITEM_CHAR_BUDGET;
   return (
-    `${body.slice(0, LIST_ITEM_CHAR_BUDGET)}...\n` +
+    `${body.slice(0, ITEM_CHAR_BUDGET)}...\n` +
     `   [+${omitted} chars - use jules_get_activity with sessionId "${sessionId}" ` +
     `and activityId "${activityRef(activity)}" for the expanded entry]\n`
   );
@@ -265,7 +260,7 @@ export function formatActivityList(data: ActivityList, sessionId: string): strin
   let used = 0;
   for (const [index, activity] of data.activities.entries()) {
     const item = `${formatActivityListItem(activity, index, sessionId)}\n`;
-    if (used + item.length > LIST_PAGE_CHAR_BUDGET) break;
+    if (used + item.length > DETAIL_CHAR_BUDGET) break;
     items.push(item);
     used += item.length;
   }
