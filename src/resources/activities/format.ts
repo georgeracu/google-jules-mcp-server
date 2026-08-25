@@ -114,22 +114,118 @@ function formatArtifactBullets(
   return artifacts.map((a) => `${indent}${formatArtifactBullet(a, indent)}\n`).join("");
 }
 
-function summaryText(activity: Activity): string {
+type ActivityRenderer = [summary: () => string, detail: () => string, listItem: () => string];
+
+function describeActivity(activity: Activity): ActivityRenderer {
   if (activity.planGenerated) {
-    const steps = activity.planGenerated.plan?.steps?.length ?? 0;
-    return `Generated execution plan with ${steps} steps`;
+    return [
+      () => {
+        const steps = activity.planGenerated?.plan?.steps;
+        const len = steps?.length ?? 0;
+        return `Generated execution plan with ${len} steps`;
+      },
+      () => {
+        const steps = activity.planGenerated?.plan?.steps;
+        return `Generated execution plan:\n${formatPlanSteps(steps, "")}`;
+      },
+      () => {
+        const steps = activity.planGenerated?.plan?.steps;
+        const len = steps?.length ?? 0;
+        let listStr = "   Generated execution plan:\n";
+        if (len > 0) {
+          listStr += "   Steps:\n" + formatPlanSteps(steps, "   ");
+        }
+        return listStr;
+      },
+    ];
   }
-  if (activity.planApproved) return "Plan approved";
-  if (activity.agentMessaged) return `Message: ${activity.agentMessaged.agentMessage}`;
-  if (activity.userMessaged) return `Received: ${activity.userMessaged.userMessage}`;
+  if (activity.planApproved) {
+    return [() => "Plan approved", () => "Plan approved", () => "   Plan approved\n"];
+  }
+  if (activity.agentMessaged) {
+    return [
+      () => `Message: ${activity.agentMessaged!.agentMessage}`,
+      () => `Message sent: ${activity.agentMessaged!.agentMessage}`,
+      () => `   Message sent: ${activity.agentMessaged!.agentMessage}\n`,
+    ];
+  }
+  if (activity.userMessaged) {
+    return [
+      () => `Received: ${activity.userMessaged!.userMessage}`,
+      () => `Message received: ${activity.userMessaged!.userMessage}`,
+      () => `   Message received: ${activity.userMessaged!.userMessage}\n`,
+    ];
+  }
   if (activity.progressUpdated) {
-    return `Progress update${activity.progressUpdated.title ? `: ${activity.progressUpdated.title}` : ""}`;
+    return [
+      () => {
+        const title = activity.progressUpdated!.title ? `: ${activity.progressUpdated!.title}` : "";
+        return `Progress update${title}`;
+      },
+      () => {
+        const title = activity.progressUpdated!.title ? `: ${activity.progressUpdated!.title}` : "";
+        const desc = activity.progressUpdated!.description
+          ? `\n${activity.progressUpdated!.description}`
+          : "";
+        return `Progress update${title}${desc}`;
+      },
+      () => {
+        const title = activity.progressUpdated!.title ? `: ${activity.progressUpdated!.title}` : "";
+        const listDesc = activity.progressUpdated!.description
+          ? `\n   ${activity.progressUpdated!.description}`
+          : "";
+        return `   Progress update${title}${listDesc}\n`;
+      },
+    ];
   }
-  if (activity.sessionCompleted) return "Session completed successfully";
-  if (activity.sessionFailed)
-    return `Session failed: ${activity.sessionFailed.reason ?? "unknown error"}`;
-  if (activity.artifacts?.length) return `Produced ${activity.artifacts.length} artifact(s)`;
-  return activity.description ?? UNKNOWN_ACTIVITY_TEXT;
+  if (activity.sessionCompleted) {
+    return [
+      () => "Session completed successfully",
+      () => "Session completed successfully",
+      () => "   Session completed successfully\n",
+    ];
+  }
+  if (activity.sessionFailed) {
+    return [
+      () => {
+        const reason = activity.sessionFailed!.reason;
+        return `Session failed: ${reason ?? "unknown error"}`;
+      },
+      () => {
+        const reason = activity.sessionFailed!.reason;
+        const detailReason = reason ? `\nReason: ${reason}` : "";
+        return `Session failed${detailReason}`;
+      },
+      () => {
+        const reason = activity.sessionFailed!.reason;
+        const listReason = reason ? `\n   Reason: ${reason}` : "";
+        return `   Session failed${listReason}\n`;
+      },
+    ];
+  }
+  if (activity.artifacts?.length) {
+    return [
+      () => `Produced ${activity.artifacts!.length} artifact(s)`,
+      () => {
+        const bullets = formatArtifactBullets(activity.artifacts!, "");
+        return `Produced ${activity.artifacts!.length} artifact(s):\n${bullets}`;
+      },
+      () => {
+        const listBullets = formatArtifactBullets(activity.artifacts!, "   ");
+        return `   Produced ${activity.artifacts!.length} artifact(s):\n${listBullets}`;
+      },
+    ];
+  }
+
+  return [
+    () => activity.description ?? UNKNOWN_ACTIVITY_TEXT,
+    () => activity.description ?? UNKNOWN_ACTIVITY_TEXT,
+    () => `   ${activity.description ?? UNKNOWN_ACTIVITY_TEXT}\n`,
+  ];
+}
+
+function summaryText(activity: Activity): string {
+  return describeActivity(activity)[0]();
 }
 
 /**
@@ -144,35 +240,7 @@ export function formatActivitySummary(activity: Activity): string {
 
 function detailText(activity: Activity): string {
   const header = `[${activity.originator ?? "unknown"}] ${activity.createTime ?? "no timestamp"}\n\n`;
-
-  if (activity.planGenerated) {
-    const stepLines = formatPlanSteps(activity.planGenerated.plan?.steps, "");
-    return `${header}Generated execution plan:\n${stepLines}`;
-  }
-  if (activity.planApproved) return `${header}Plan approved`;
-  if (activity.agentMessaged)
-    return `${header}Message sent: ${activity.agentMessaged.agentMessage}`;
-  if (activity.userMessaged)
-    return `${header}Message received: ${activity.userMessaged.userMessage}`;
-  if (activity.progressUpdated) {
-    const title = activity.progressUpdated.title ? `: ${activity.progressUpdated.title}` : "";
-    const description = activity.progressUpdated.description
-      ? `\n${activity.progressUpdated.description}`
-      : "";
-    return `${header}Progress update${title}${description}`;
-  }
-  if (activity.sessionCompleted) return `${header}Session completed successfully`;
-  if (activity.sessionFailed) {
-    const reason = activity.sessionFailed.reason
-      ? `\nReason: ${activity.sessionFailed.reason}`
-      : "";
-    return `${header}Session failed${reason}`;
-  }
-  if (activity.artifacts?.length) {
-    const bullets = formatArtifactBullets(activity.artifacts, "");
-    return `${header}Produced ${activity.artifacts.length} artifact(s):\n${bullets}`;
-  }
-  return `${header}${activity.description ?? UNKNOWN_ACTIVITY_TEXT}`;
+  return `${header}${describeActivity(activity)[1]()}`;
 }
 
 /**
@@ -198,40 +266,8 @@ export function formatActivityDetail(activity: Activity): string {
 function listItemText(activity: Activity, index: number): string {
   const originator = activity.originator ?? "unknown";
   const createTime = activity.createTime ?? "no timestamp";
-  let body = `${index + 1}. [${originator}] ${createTime}\n`;
-
-  if (activity.planGenerated) {
-    const steps = activity.planGenerated.plan?.steps ?? [];
-    body += "   Generated execution plan:\n";
-    if (steps.length > 0) {
-      body += "   Steps:\n";
-      body += formatPlanSteps(steps, "   ");
-    }
-  } else if (activity.planApproved) {
-    body += "   Plan approved\n";
-  } else if (activity.agentMessaged) {
-    body += `   Message sent: ${activity.agentMessaged.agentMessage}\n`;
-  } else if (activity.userMessaged) {
-    body += `   Message received: ${activity.userMessaged.userMessage}\n`;
-  } else if (activity.progressUpdated) {
-    body += "   Progress update";
-    if (activity.progressUpdated.title) body += `: ${activity.progressUpdated.title}`;
-    body += "\n";
-    if (activity.progressUpdated.description)
-      body += `   ${activity.progressUpdated.description}\n`;
-  } else if (activity.sessionCompleted) {
-    body += "   Session completed successfully\n";
-  } else if (activity.sessionFailed) {
-    body += "   Session failed\n";
-    if (activity.sessionFailed.reason) body += `   Reason: ${activity.sessionFailed.reason}\n`;
-  } else if (activity.artifacts?.length) {
-    body += `   Produced ${activity.artifacts.length} artifact(s):\n`;
-    body += formatArtifactBullets(activity.artifacts, "   ");
-  } else {
-    body += `   ${activity.description ?? UNKNOWN_ACTIVITY_TEXT}\n`;
-  }
-
-  return body;
+  const header = `${index + 1}. [${originator}] ${createTime}\n`;
+  return `${header}${describeActivity(activity)[2]()}`;
 }
 
 /**
