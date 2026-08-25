@@ -14,6 +14,7 @@ import {
   formatStuckSessionList,
   formatWaitResolution,
   formatWaitTimeout,
+  TERMINAL_STATES,
 } from "./format.js";
 import { CreateSessionRequestSchema, type CreateSessionRequest, type Session } from "./schemas.js";
 
@@ -59,13 +60,9 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         return errorResult(`Error getting session status: ${formatErrorForUser(error)}`);
       }
 
-      const isTerminal = [
-        "COMPLETED",
-        "FAILED",
-        "AWAITING_PLAN_APPROVAL",
-        "AWAITING_USER_FEEDBACK",
-        "PAUSED",
-      ].includes(session.state ?? "STATE_UNSPECIFIED");
+      const isTerminal = (TERMINAL_STATES as readonly string[]).includes(
+        session.state ?? "STATE_UNSPECIFIED"
+      );
 
       const elapsedMs = Date.now() - start;
       const isTimeout = elapsedMs >= maxWaitMs;
