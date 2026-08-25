@@ -16,6 +16,22 @@ import {
 } from "./format.js";
 import { CreateSessionRequestSchema, type CreateSessionRequest, type Session } from "./schemas.js";
 
+interface WaitExtra {
+  signal?: AbortSignal;
+  _meta?: {
+    progressToken?: string | number;
+  };
+  sendNotification?: (notification: {
+    method: "notifications/progress";
+    params: {
+      progressToken: string | number;
+      progress: number;
+      total: number;
+      message: string;
+    };
+  }) => Promise<void>;
+}
+
 const SESSION_CREATE_ERR_TEXT =
   "Common issues:\n- Repository not connected to Jules (run jules_list_sources)\n- Invalid repository owner/name\n- Branch does not exist";
 
@@ -48,22 +64,6 @@ function buildSessionRequest({
   });
 }
 
-interface WaitExtra {
-  signal?: AbortSignal;
-  _meta?: {
-    progressToken?: string | number;
-  };
-  sendNotification?: (notification: {
-    method: "notifications/progress";
-    params: {
-      progressToken: string | number;
-      progress: number;
-      total: number;
-      message: string;
-    };
-  }) => Promise<void>;
-}
-
 export function createSessionHandlers(sessions: SessionsClient, activities: ActivitiesClient) {
   const pollSession = async (
     sessionId: string,
@@ -88,7 +88,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         return { content: [], _rawSession: s };
       });
       if (sessionResult.isError) return sessionResult;
-      const session = sessionResult._rawSession as any;
+      const session = sessionResult._rawSession as Session;
 
       const isTerminal = [
         "COMPLETED",
@@ -178,7 +178,9 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
             })
           );
         },
-        `\n\n${SESSION_CREATE_ERR_TEXT}`
+        `
+
+${SESSION_CREATE_ERR_TEXT}`
       ),
 
     waitForSession: async (
@@ -236,7 +238,9 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
           const session = await sessions.createSession(request);
           return await pollSession(session.id, maxWaitSeconds, includeActivities, extra);
         },
-        `\n\n${SESSION_CREATE_ERR_TEXT}`
+        `
+
+${SESSION_CREATE_ERR_TEXT}`
       ),
 
     listSessions: ({
@@ -334,13 +338,17 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
     archiveSession: ({ sessionId }: { sessionId: string }): Promise<ToolResult> =>
       wrap("Error archiving session", async () => {
         const session = await sessions.archiveSession(sessionId);
-        return textResult(`Session ${sessionId} archived.\n\nState: ${session.state}`);
+        return textResult(`Session ${sessionId} archived.
+
+State: ${session.state}`);
       }),
 
     unarchiveSession: ({ sessionId }: { sessionId: string }): Promise<ToolResult> =>
       wrap("Error unarchiving session", async () => {
         const session = await sessions.unarchiveSession(sessionId);
-        return textResult(`Session ${sessionId} unarchived.\n\nState: ${session.state}`);
+        return textResult(`Session ${sessionId} unarchived.
+
+State: ${session.state}`);
       }),
   };
 }
