@@ -33,6 +33,38 @@ interface WaitExtra {
   }) => Promise<void>;
 }
 
+const SESSION_CREATE_ERR_TEXT =
+  "Common issues:\n- Repository not connected to Jules (run jules_list_sources)\n- Invalid repository owner/name\n- Branch does not exist";
+
+function buildSessionRequest({
+  repoOwner,
+  repoName,
+  prompt,
+  branch,
+  autoApprove,
+  autoCreatePR,
+  title,
+}: {
+  repoOwner: string;
+  repoName: string;
+  prompt: string;
+  branch: string;
+  autoApprove: boolean;
+  autoCreatePR: boolean;
+  title?: string;
+}): CreateSessionRequest {
+  return CreateSessionRequestSchema.parse({
+    prompt,
+    sourceContext: {
+      source: `sources/github/${repoOwner}/${repoName}`,
+      githubRepoContext: { startingBranch: branch },
+    },
+    title: title || `${repoName}: ${prompt.slice(0, 50)}`,
+    requirePlanApproval: !autoApprove,
+    ...(autoCreatePR ? { automationMode: "AUTO_CREATE_PR" as const } : {}),
+  });
+}
+
 export function createSessionHandlers(sessions: SessionsClient, activities: ActivitiesClient) {
   const pollSession = async (
     sessionId: string,
@@ -126,15 +158,14 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
       title?: string;
     }): Promise<ToolResult> => {
       try {
-        const request: CreateSessionRequest = CreateSessionRequestSchema.parse({
+        const request = buildSessionRequest({
+          repoOwner,
+          repoName,
           prompt,
-          sourceContext: {
-            source: `sources/github/${repoOwner}/${repoName}`,
-            githubRepoContext: { startingBranch: branch },
-          },
-          title: title || `${repoName}: ${prompt.slice(0, 50)}`,
-          requirePlanApproval: !autoApprove,
-          ...(autoCreatePR ? { automationMode: "AUTO_CREATE_PR" as const } : {}),
+          branch,
+          autoApprove,
+          autoCreatePR,
+          title,
         });
 
         const session = await sessions.createSession(request);
@@ -143,8 +174,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         );
       } catch (error) {
         return errorResult(
-          `Error creating session: ${formatErrorForUser(error)}\n\n` +
-            "Common issues:\n- Repository not connected to Jules (run jules_list_sources)\n- Invalid repository owner/name\n- Branch does not exist"
+          `Error creating session: ${formatErrorForUser(error)}\n\n${SESSION_CREATE_ERR_TEXT}`
         );
       }
     },
@@ -189,23 +219,21 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
       extra?: WaitExtra
     ): Promise<ToolResult> => {
       try {
-        const request: CreateSessionRequest = CreateSessionRequestSchema.parse({
+        const request = buildSessionRequest({
+          repoOwner,
+          repoName,
           prompt,
-          sourceContext: {
-            source: `sources/github/${repoOwner}/${repoName}`,
-            githubRepoContext: { startingBranch: branch },
-          },
-          title: title || `${repoName}: ${prompt.slice(0, 50)}`,
-          requirePlanApproval: !autoApprove,
-          ...(autoCreatePR ? { automationMode: "AUTO_CREATE_PR" as const } : {}),
+          branch,
+          autoApprove,
+          autoCreatePR,
+          title,
         });
 
         const session = await sessions.createSession(request);
         return await pollSession(session.id, maxWaitSeconds, includeActivities, extra);
       } catch (error) {
         return errorResult(
-          `Error creating session: ${formatErrorForUser(error)}\n\n` +
-            "Common issues:\n- Repository not connected to Jules (run jules_list_sources)\n- Invalid repository owner/name\n- Branch does not exist"
+          `Error creating session: ${formatErrorForUser(error)}\n\n${SESSION_CREATE_ERR_TEXT}`
         );
       }
     },
