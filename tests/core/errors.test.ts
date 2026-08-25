@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  formatErrorForUser,
-  JulesApiError,
-  mapResponseToError,
-} from "../../src/core/errors.js";
+import { formatErrorForUser, JulesApiError, mapResponseToError } from "../../src/core/errors.js";
 
 describe("mapResponseToError", () => {
   it("maps 403 to an auth error", async () => {
