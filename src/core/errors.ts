@@ -1,59 +1,37 @@
 import type { z } from "zod";
 
-export abstract class JulesApiError extends Error {}
+export type JulesApiErrorKind =
+  | "auth"
+  | "not_found"
+  | "rate_limit"
+  | "server"
+  | "client"
+  | "network"
+  | "validation";
 
-export class JulesAuthError extends JulesApiError {
-  constructor(message: string) {
-    super(message);
-    this.name = "JulesAuthError";
-  }
+export interface JulesApiErrorOptions {
+  kind: JulesApiErrorKind;
+  status?: number;
+  retryAfterMs?: number;
+  path?: string;
+  zodError?: z.ZodError;
 }
 
-export class JulesNotFoundError extends JulesApiError {
-  constructor(message: string) {
-    super(message);
-    this.name = "JulesNotFoundError";
-  }
-}
+export class JulesApiError extends Error {
+  public readonly kind: JulesApiErrorKind;
+  public readonly status?: number;
+  public readonly retryAfterMs?: number;
+  public readonly path?: string;
+  public readonly zodError?: z.ZodError;
 
-export class JulesRateLimitError extends JulesApiError {
-  constructor(
-    message: string,
-    public readonly retryAfterMs?: number
-  ) {
+  constructor(message: string, options: JulesApiErrorOptions) {
     super(message);
-    this.name = "JulesRateLimitError";
-  }
-}
-
-export class JulesServerError extends JulesApiError {
-  constructor(message: string) {
-    super(message);
-    this.name = "JulesServerError";
-  }
-}
-
-export class JulesClientError extends JulesApiError {
-  constructor(message: string) {
-    super(message);
-    this.name = "JulesClientError";
-  }
-}
-
-export class JulesNetworkError extends JulesApiError {
-  constructor(message: string) {
-    super(message);
-    this.name = "JulesNetworkError";
-  }
-}
-
-export class JulesResponseValidationError extends JulesApiError {
-  constructor(
-    public readonly path: string,
-    public readonly zodError: z.ZodError
-  ) {
-    super(`Response from ${path} did not match the expected schema: ${zodError.message}`);
-    this.name = "JulesResponseValidationError";
+    this.name = "JulesApiError";
+    this.kind = options.kind;
+    this.status = options.status;
+    this.retryAfterMs = options.retryAfterMs;
+    this.path = options.path;
+    this.zodError = options.zodError;
   }
 }
 
@@ -95,18 +73,22 @@ export async function mapResponseToError(response: Response): Promise<JulesApiEr
   }
 
   if (response.status === 401 || response.status === 403) {
-    return new JulesAuthError(message);
+    return new JulesApiError(message, { kind: "auth", status: response.status });
   }
   if (response.status === 404) {
-    return new JulesNotFoundError(message);
+    return new JulesApiError(message, { kind: "not_found", status: response.status });
   }
   if (response.status === 429) {
-    return new JulesRateLimitError(message, parseRetryAfterMs(response.headers.get("retry-after")));
+    return new JulesApiError(message, {
+      kind: "rate_limit",
+      status: response.status,
+      retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+    });
   }
   if (response.status >= 500) {
-    return new JulesServerError(message);
+    return new JulesApiError(message, { kind: "server", status: response.status });
   }
-  return new JulesClientError(message);
+  return new JulesApiError(message, { kind: "client", status: response.status });
 }
 
 /**
