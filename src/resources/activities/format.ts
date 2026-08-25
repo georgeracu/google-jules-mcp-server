@@ -116,75 +116,118 @@ function formatArtifactBullets(
   return artifacts.map((a) => `${indent}${formatArtifactBullet(a, indent)}\n`).join("");
 }
 
-function describeActivity(activity: Activity): [string, string, string] {
+type ActivityRenderer = [summary: () => string, detail: () => string, listItem: () => string];
+
+function describeActivity(activity: Activity): ActivityRenderer {
   if (activity.planGenerated) {
-    const steps = activity.planGenerated.plan?.steps;
-    const len = steps?.length ?? 0;
-    let listStr = "   Generated execution plan:\n";
-    if (len > 0) {
-      listStr += "   Steps:\n" + formatPlanSteps(steps, "   ");
-    }
     return [
-      `Generated execution plan with ${len} steps`,
-      `Generated execution plan:\n${formatPlanSteps(steps, "")}`,
-      listStr,
+      () => {
+        const steps = activity.planGenerated?.plan?.steps;
+        const len = steps?.length ?? 0;
+        return `Generated execution plan with ${len} steps`;
+      },
+      () => {
+        const steps = activity.planGenerated?.plan?.steps;
+        return `Generated execution plan:\n${formatPlanSteps(steps, "")}`;
+      },
+      () => {
+        const steps = activity.planGenerated?.plan?.steps;
+        const len = steps?.length ?? 0;
+        let listStr = "   Generated execution plan:\n";
+        if (len > 0) {
+          listStr += "   Steps:\n" + formatPlanSteps(steps, "   ");
+        }
+        return listStr;
+      },
     ];
   }
-  if (activity.planApproved) return ["Plan approved", "Plan approved", "   Plan approved\n"];
+  if (activity.planApproved) {
+    return [() => "Plan approved", () => "Plan approved", () => "   Plan approved\n"];
+  }
   if (activity.agentMessaged) {
-    const msg = activity.agentMessaged.agentMessage;
-    return [`Message: ${msg}`, `Message sent: ${msg}`, `   Message sent: ${msg}\n`];
+    return [
+      () => `Message: ${activity.agentMessaged!.agentMessage}`,
+      () => `Message sent: ${activity.agentMessaged!.agentMessage}`,
+      () => `   Message sent: ${activity.agentMessaged!.agentMessage}\n`,
+    ];
   }
   if (activity.userMessaged) {
-    const msg = activity.userMessaged.userMessage;
-    return [`Received: ${msg}`, `Message received: ${msg}`, `   Message received: ${msg}\n`];
+    return [
+      () => `Received: ${activity.userMessaged!.userMessage}`,
+      () => `Message received: ${activity.userMessaged!.userMessage}`,
+      () => `   Message received: ${activity.userMessaged!.userMessage}\n`,
+    ];
   }
   if (activity.progressUpdated) {
-    const title = activity.progressUpdated.title ? `: ${activity.progressUpdated.title}` : "";
-    const desc = activity.progressUpdated.description
-      ? `\n${activity.progressUpdated.description}`
-      : "";
-    const listDesc = activity.progressUpdated.description
-      ? `\n   ${activity.progressUpdated.description}`
-      : "";
     return [
-      `Progress update${title}`,
-      `Progress update${title}${desc}`,
-      `   Progress update${title}${listDesc}\n`,
+      () => {
+        const title = activity.progressUpdated!.title ? `: ${activity.progressUpdated!.title}` : "";
+        return `Progress update${title}`;
+      },
+      () => {
+        const title = activity.progressUpdated!.title ? `: ${activity.progressUpdated!.title}` : "";
+        const desc = activity.progressUpdated!.description
+          ? `\n${activity.progressUpdated!.description}`
+          : "";
+        return `Progress update${title}${desc}`;
+      },
+      () => {
+        const title = activity.progressUpdated!.title ? `: ${activity.progressUpdated!.title}` : "";
+        const listDesc = activity.progressUpdated!.description
+          ? `\n   ${activity.progressUpdated!.description}`
+          : "";
+        return `   Progress update${title}${listDesc}\n`;
+      },
     ];
   }
   if (activity.sessionCompleted) {
     return [
-      "Session completed successfully",
-      "Session completed successfully",
-      "   Session completed successfully\n",
+      () => "Session completed successfully",
+      () => "Session completed successfully",
+      () => "   Session completed successfully\n",
     ];
   }
   if (activity.sessionFailed) {
-    const reason = activity.sessionFailed.reason;
-    const detailReason = reason ? `\nReason: ${reason}` : "";
-    const listReason = reason ? `\n   Reason: ${reason}` : "";
     return [
-      `Session failed: ${reason ?? "unknown error"}`,
-      `Session failed${detailReason}`,
-      `   Session failed${listReason}\n`,
+      () => {
+        const reason = activity.sessionFailed!.reason;
+        return `Session failed: ${reason ?? "unknown error"}`;
+      },
+      () => {
+        const reason = activity.sessionFailed!.reason;
+        const detailReason = reason ? `\nReason: ${reason}` : "";
+        return `Session failed${detailReason}`;
+      },
+      () => {
+        const reason = activity.sessionFailed!.reason;
+        const listReason = reason ? `\n   Reason: ${reason}` : "";
+        return `   Session failed${listReason}\n`;
+      },
     ];
   }
   if (activity.artifacts?.length) {
-    const bullets = formatArtifactBullets(activity.artifacts, "");
-    const listBullets = formatArtifactBullets(activity.artifacts, "   ");
     return [
-      `Produced ${activity.artifacts.length} artifact(s)`,
-      `Produced ${activity.artifacts.length} artifact(s):\n${bullets}`,
-      `   Produced ${activity.artifacts.length} artifact(s):\n${listBullets}`,
+      () => `Produced ${activity.artifacts!.length} artifact(s)`,
+      () => {
+        const bullets = formatArtifactBullets(activity.artifacts!, "");
+        return `Produced ${activity.artifacts!.length} artifact(s):\n${bullets}`;
+      },
+      () => {
+        const listBullets = formatArtifactBullets(activity.artifacts!, "   ");
+        return `   Produced ${activity.artifacts!.length} artifact(s):\n${listBullets}`;
+      },
     ];
   }
-  const fallback = activity.description ?? UNKNOWN_ACTIVITY_TEXT;
-  return [fallback, fallback, `   ${fallback}\n`];
+
+  return [
+    () => activity.description ?? UNKNOWN_ACTIVITY_TEXT,
+    () => activity.description ?? UNKNOWN_ACTIVITY_TEXT,
+    () => `   ${activity.description ?? UNKNOWN_ACTIVITY_TEXT}\n`,
+  ];
 }
 
 function summaryText(activity: Activity): string {
-  return describeActivity(activity)[0];
+  return describeActivity(activity)[0]();
 }
 
 /**
@@ -199,7 +242,7 @@ export function formatActivitySummary(activity: Activity): string {
 
 function detailText(activity: Activity): string {
   const header = `[${activity.originator ?? "unknown"}] ${activity.createTime ?? "no timestamp"}\n\n`;
-  return `${header}${describeActivity(activity)[1]}`;
+  return `${header}${describeActivity(activity)[1]()}`;
 }
 
 /**
@@ -226,7 +269,7 @@ function listItemText(activity: Activity, index: number): string {
   const originator = activity.originator ?? "unknown";
   const createTime = activity.createTime ?? "no timestamp";
   const header = `${index + 1}. [${originator}] ${createTime}\n`;
-  return `${header}${describeActivity(activity)[2]}`;
+  return `${header}${describeActivity(activity)[2]()}`;
 }
 
 /**
