@@ -265,14 +265,14 @@ describe("output caps", () => {
     expect(text).not.toContain("from-name");
   });
 
-  it("leaves an entry inside the slack window whole rather than inflating it with a hint", () => {
-    const text = listOne({ agentMessaged: { agentMessage: longText(900) } });
-    expect(text).toContain(longText(900));
+  it("leaves an entry inside the item budget whole rather than inflating it with a hint", () => {
+    const text = listOne({ agentMessaged: { agentMessage: longText(700) } });
+    expect(text).toContain(longText(700));
     expect(text).not.toContain("use jules_get_activity");
   });
 
-  it("caps an entry once past the slack window", () => {
-    expect(listOne({ agentMessaged: { agentMessage: longText(1000) } })).toContain(
+  it("caps an entry once past the item budget", () => {
+    expect(listOne({ agentMessaged: { agentMessage: longText(900) } })).toContain(
       "use jules_get_activity"
     );
   });
