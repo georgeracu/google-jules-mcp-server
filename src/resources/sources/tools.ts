@@ -2,7 +2,6 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { textResult, wrap, type ToolResult } from "../../core/tool-result.js";
-import { PageParams } from "../../shared/pagination.js";
 import type { SourcesClient } from "./client.js";
 import { formatSource, formatSourceList } from "./format.js";
 
@@ -10,16 +9,23 @@ export function createSourceHandlers(client: SourcesClient) {
   return {
     listSources: ({
       pageSize,
-      pageToken,
       filter,
     }: {
       pageSize?: number;
-      pageToken?: string;
       filter?: string;
     }): Promise<ToolResult> =>
       wrap("Error listing sources", async () => {
-        const data = await client.listSources({ pageSize, pageToken, filter });
-        return textResult(formatSourceList(data));
+        const sources = [];
+        let pageToken: string | undefined;
+
+        for (let page = 0; page < 10; page++) {
+          const data = await client.listSources({ pageSize, pageToken, filter });
+          sources.push(...(data.sources ?? []));
+          pageToken = data.nextPageToken;
+          if (!pageToken) break;
+        }
+
+        return textResult(formatSourceList({ sources, nextPageToken: pageToken }));
       }),
 
     getSource: ({
@@ -50,7 +56,10 @@ export function registerSourceTools(server: McpServer, client: SourcesClient): v
       description:
         "List all GitHub repositories connected to Jules. You must install the Jules GitHub app at https://jules.google.com before repositories appear here.",
       inputSchema: {
-        ...PageParams,
+        pageSize: z
+          .number()
+          .default(50)
+          .describe("Number of sources to fetch per page (default: 50)"),
         filter: z
           .string()
           .optional()
