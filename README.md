@@ -176,7 +176,7 @@ If you installed globally instead, replace `"command": "npx", "args": ["-y", "go
 
 If you're running from a local clone instead, use `"command": "node", "args": ["/absolute/path/to/google-jules-mcp-server/build/index.js"]` (an absolute path to `build/index.js`).
 
-**Behind a corporate proxy** — the server honours the standard `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` variables, and there is nothing to configure on the server itself. What catches people out is that your MCP client spawns the server as a child process, so a variable exported in `~/.zshrc` never reaches a GUI-launched app. Set it in the same `env` block as your API key:
+**Behind a corporate proxy** — to support enterprise/corporate proxy setups without requiring any server-side config, the server automatically picks up proxy settings from the environment. The underlying `EnvHttpProxyAgent` (from `undici`) honours the standard `HTTPS_PROXY`, `https_proxy`, `HTTP_PROXY`, `http_proxy`, and `NO_PROXY` variables. What catches people out is that your MCP client spawns the server as a child process, so a variable exported in `~/.zshrc` never reaches a GUI-launched app. Set it in the same `env` block as your API key:
 
 ```json
 {

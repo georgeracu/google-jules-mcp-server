@@ -2,8 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import type { ActivitiesClient } from "../activities/client.js";
-import { formatErrorForUser } from "../../core/errors.js";
-import { errorResult, textResult, type ToolResult } from "../../core/tool-result.js";
+import { textResult, wrap, type ToolResult } from "../../core/tool-result.js";
 import { PageParams } from "../../shared/pagination.js";
 import type { SessionsClient } from "./client.js";
 import {
@@ -14,6 +13,7 @@ import {
   formatStuckSessionList,
   formatWaitResolution,
   formatWaitTimeout,
+  TERMINAL_STATES,
 } from "./format.js";
 import { CreateSessionRequestSchema, type CreateSessionRequest, type Session } from "./schemas.js";
 
@@ -31,6 +31,38 @@ interface WaitExtra {
       message: string;
     };
   }) => Promise<void>;
+}
+
+const SESSION_CREATE_ERR_TEXT =
+  "Common issues:\n- Repository not connected to Jules (run jules_list_sources)\n- Invalid repository owner/name\n- Branch does not exist";
+
+function buildSessionRequest({
+  repoOwner,
+  repoName,
+  prompt,
+  branch,
+  autoApprove,
+  autoCreatePR,
+  title,
+}: {
+  repoOwner: string;
+  repoName: string;
+  prompt: string;
+  branch: string;
+  autoApprove: boolean;
+  autoCreatePR: boolean;
+  title?: string;
+}): CreateSessionRequest {
+  return CreateSessionRequestSchema.parse({
+    prompt,
+    sourceContext: {
+      source: `sources/github/${repoOwner}/${repoName}`,
+      githubRepoContext: { startingBranch: branch },
+    },
+    title: title || `${repoName}: ${prompt.slice(0, 50)}`,
+    requirePlanApproval: !autoApprove,
+    ...(autoCreatePR ? { automationMode: "AUTO_CREATE_PR" as const } : {}),
+  });
 }
 
 export function createSessionHandlers(sessions: SessionsClient, activities: ActivitiesClient) {
@@ -52,26 +84,22 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         return textResult(`Wait operation was cancelled. Current session state: ${session.state}`);
       }
 
-      let session;
-      try {
-        session = await sessions.getSession(sessionId);
-      } catch (error) {
-        return errorResult(`Error getting session status: ${formatErrorForUser(error)}`);
-      }
+      const sessionResult = await wrap("Error getting session status", async () => {
+        const s = await sessions.getSession(sessionId);
+        return { content: [], _rawSession: s };
+      });
+      if (sessionResult.isError) return sessionResult;
+      const session = sessionResult._rawSession as Session;
 
-      const isTerminal = [
-        "COMPLETED",
-        "FAILED",
-        "AWAITING_PLAN_APPROVAL",
-        "AWAITING_USER_FEEDBACK",
-        "PAUSED",
-      ].includes(session.state ?? "STATE_UNSPECIFIED");
+      const isTerminal = (TERMINAL_STATES as readonly string[]).includes(
+        session.state ?? "STATE_UNSPECIFIED"
+      );
 
       const elapsedMs = Date.now() - start;
       const isTimeout = elapsedMs >= maxWaitMs;
 
       if (isTerminal || isTimeout) {
-        try {
+        return wrap("Error fetching activities", async () => {
           const activityList = await activities.listActivities(sessionId, {
             pageSize: includeActivities,
           });
@@ -80,9 +108,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
           } else {
             return textResult(formatWaitTimeout(session, activityList, clampedMaxWaitSeconds));
           }
-        } catch (error) {
-          return errorResult(`Error fetching activities: ${formatErrorForUser(error)}`);
-        }
+        });
       }
 
       if (extra?._meta?.progressToken !== undefined && extra.sendNotification !== undefined) {
@@ -108,7 +134,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
   };
 
   return {
-    createSession: async ({
+    createSession: ({
       repoOwner,
       repoName,
       prompt,
@@ -124,30 +150,35 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
       autoApprove: boolean;
       autoCreatePR: boolean;
       title?: string;
-    }): Promise<ToolResult> => {
-      try {
-        const request: CreateSessionRequest = CreateSessionRequestSchema.parse({
-          prompt,
-          sourceContext: {
-            source: `sources/github/${repoOwner}/${repoName}`,
-            githubRepoContext: { startingBranch: branch },
-          },
-          title: title || `${repoName}: ${prompt.slice(0, 50)}`,
-          requirePlanApproval: !autoApprove,
-          ...(autoCreatePR ? { automationMode: "AUTO_CREATE_PR" as const } : {}),
-        });
+    }): Promise<ToolResult> =>
+      wrap(
+        "Error creating session",
+        async () => {
+          const request = buildSessionRequest({
+            repoOwner,
+            repoName,
+            prompt,
+            branch,
+            autoApprove,
+            autoCreatePR,
+            title,
+          });
 
-        const session = await sessions.createSession(request);
-        return textResult(
-          formatSessionCreated(session, { repoOwner, repoName, branch, autoApprove, autoCreatePR })
-        );
-      } catch (error) {
-        return errorResult(
-          `Error creating session: ${formatErrorForUser(error)}\n\n` +
-            "Common issues:\n- Repository not connected to Jules (run jules_list_sources)\n- Invalid repository owner/name\n- Branch does not exist"
-        );
-      }
-    },
+          const session = await sessions.createSession(request);
+          return textResult(
+            formatSessionCreated(session, {
+              repoOwner,
+              repoName,
+              branch,
+              autoApprove,
+              autoCreatePR,
+            })
+          );
+        },
+        `
+
+${SESSION_CREATE_ERR_TEXT}`
+      ),
 
     waitForSession: async (
       {
@@ -164,7 +195,7 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
       return pollSession(sessionId, maxWaitSeconds, includeActivities, extra);
     },
 
-    executeAndWait: async (
+    executeAndWait: (
       {
         repoOwner,
         repoName,
@@ -187,46 +218,42 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         includeActivities: number;
       },
       extra?: WaitExtra
-    ): Promise<ToolResult> => {
-      try {
-        const request: CreateSessionRequest = CreateSessionRequestSchema.parse({
-          prompt,
-          sourceContext: {
-            source: `sources/github/${repoOwner}/${repoName}`,
-            githubRepoContext: { startingBranch: branch },
-          },
-          title: title || `${repoName}: ${prompt.slice(0, 50)}`,
-          requirePlanApproval: !autoApprove,
-          ...(autoCreatePR ? { automationMode: "AUTO_CREATE_PR" as const } : {}),
-        });
+    ): Promise<ToolResult> =>
+      wrap(
+        "Error creating session",
+        async () => {
+          const request = buildSessionRequest({
+            repoOwner,
+            repoName,
+            prompt,
+            branch,
+            autoApprove,
+            autoCreatePR,
+            title,
+          });
 
-        const session = await sessions.createSession(request);
-        return await pollSession(session.id, maxWaitSeconds, includeActivities, extra);
-      } catch (error) {
-        return errorResult(
-          `Error creating session: ${formatErrorForUser(error)}\n\n` +
-            "Common issues:\n- Repository not connected to Jules (run jules_list_sources)\n- Invalid repository owner/name\n- Branch does not exist"
-        );
-      }
-    },
+          const session = await sessions.createSession(request);
+          return await pollSession(session.id, maxWaitSeconds, includeActivities, extra);
+        },
+        `
 
-    listSessions: async ({
+${SESSION_CREATE_ERR_TEXT}`
+      ),
+
+    listSessions: ({
       pageSize,
       pageToken,
     }: {
       pageSize: number;
       pageToken?: string;
-    }): Promise<ToolResult> => {
-      try {
+    }): Promise<ToolResult> =>
+      wrap("Error listing sessions", async () => {
         const data = await sessions.listSessions({ pageSize, pageToken });
         return textResult(formatSessionList(data));
-      } catch (error) {
-        return errorResult(`Error listing sessions: ${formatErrorForUser(error)}`);
-      }
-    },
+      }),
 
-    listStuckSessions: async ({ pageSize }: { pageSize: number }): Promise<ToolResult> => {
-      try {
+    listStuckSessions: ({ pageSize }: { pageSize: number }): Promise<ToolResult> =>
+      wrap("Error listing stuck sessions", async () => {
         const stuckSessions: Session[] = [];
         let sessionsScanned = 0;
         let pageToken: string | undefined;
@@ -248,97 +275,78 @@ export function createSessionHandlers(sessions: SessionsClient, activities: Acti
         }
 
         return textResult(formatStuckSessionList({ sessions: stuckSessions }));
-      } catch (error) {
-        return errorResult(`Error listing stuck sessions: ${formatErrorForUser(error)}`);
-      }
-    },
+      }),
 
-    getStatus: async ({
+    getStatus: ({
       sessionId,
       includeActivities,
     }: {
       sessionId: string;
       includeActivities: number;
-    }): Promise<ToolResult> => {
-      try {
+    }): Promise<ToolResult> =>
+      wrap("Error getting session status", async () => {
         const [session, activityList] = await Promise.all([
           sessions.getSession(sessionId),
           activities.listActivities(sessionId, { pageSize: includeActivities }),
         ]);
         return textResult(formatSessionStatus(session, activityList));
-      } catch (error) {
-        return errorResult(`Error getting session status: ${formatErrorForUser(error)}`);
-      }
-    },
+      }),
 
-    sendMessage: async ({
+    sendMessage: ({
       sessionId,
       message,
     }: {
       sessionId: string;
       message: string;
-    }): Promise<ToolResult> => {
-      try {
+    }): Promise<ToolResult> =>
+      wrap("Error sending message", async () => {
         await sessions.sendMessage(sessionId, { prompt: message });
         return textResult(
           `Message sent successfully to session ${sessionId}.\n\n` +
             "Jules will respond in the next activity. Use jules_list_activities or jules_get_status to see the response."
         );
-      } catch (error) {
-        return errorResult(`Error sending message: ${formatErrorForUser(error)}`);
-      }
-    },
+      }),
 
-    approvePlan: async ({ sessionId }: { sessionId: string }): Promise<ToolResult> => {
-      try {
-        await sessions.approvePlan(sessionId);
-        return textResult(
-          `Plan approved for session ${sessionId}.\n\n` +
-            "Jules will now execute the task. Use jules_get_status to monitor progress."
-        );
-      } catch (error) {
-        return errorResult(
-          `Error approving plan: ${formatErrorForUser(error)}\n\n` +
-            "Note: This only works for sessions created with autoApprove=false and state AWAITING_PLAN_APPROVAL."
-        );
-      }
-    },
+    approvePlan: ({ sessionId }: { sessionId: string }): Promise<ToolResult> =>
+      wrap(
+        "Error approving plan",
+        async () => {
+          await sessions.approvePlan(sessionId);
+          return textResult(
+            `Plan approved for session ${sessionId}.\n\n` +
+              "Jules will now execute the task. Use jules_get_status to monitor progress."
+          );
+        },
+        "\n\nNote: This only works for sessions created with autoApprove=false and state AWAITING_PLAN_APPROVAL."
+      ),
 
-    getSessionOutput: async ({ sessionId }: { sessionId: string }): Promise<ToolResult> => {
-      try {
+    getSessionOutput: ({ sessionId }: { sessionId: string }): Promise<ToolResult> =>
+      wrap("Error getting session output", async () => {
         const session = await sessions.getSession(sessionId);
         return textResult(formatSessionOutput(session));
-      } catch (error) {
-        return errorResult(`Error getting session output: ${formatErrorForUser(error)}`);
-      }
-    },
+      }),
 
-    deleteSession: async ({ sessionId }: { sessionId: string }): Promise<ToolResult> => {
-      try {
+    deleteSession: ({ sessionId }: { sessionId: string }): Promise<ToolResult> =>
+      wrap("Error deleting session", async () => {
         await sessions.deleteSession(sessionId);
         return textResult(`Session ${sessionId} deleted.`);
-      } catch (error) {
-        return errorResult(`Error deleting session: ${formatErrorForUser(error)}`);
-      }
-    },
+      }),
 
-    archiveSession: async ({ sessionId }: { sessionId: string }): Promise<ToolResult> => {
-      try {
+    archiveSession: ({ sessionId }: { sessionId: string }): Promise<ToolResult> =>
+      wrap("Error archiving session", async () => {
         const session = await sessions.archiveSession(sessionId);
-        return textResult(`Session ${sessionId} archived.\n\nState: ${session.state}`);
-      } catch (error) {
-        return errorResult(`Error archiving session: ${formatErrorForUser(error)}`);
-      }
-    },
+        return textResult(`Session ${sessionId} archived.
 
-    unarchiveSession: async ({ sessionId }: { sessionId: string }): Promise<ToolResult> => {
-      try {
+State: ${session.state}`);
+      }),
+
+    unarchiveSession: ({ sessionId }: { sessionId: string }): Promise<ToolResult> =>
+      wrap("Error unarchiving session", async () => {
         const session = await sessions.unarchiveSession(sessionId);
-        return textResult(`Session ${sessionId} unarchived.\n\nState: ${session.state}`);
-      } catch (error) {
-        return errorResult(`Error unarchiving session: ${formatErrorForUser(error)}`);
-      }
-    },
+        return textResult(`Session ${sessionId} unarchived.
+
+State: ${session.state}`);
+      }),
   };
 }
 

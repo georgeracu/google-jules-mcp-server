@@ -2,7 +2,7 @@ import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 import type { z } from "zod";
 
 import { JULES_API_BASE } from "./config.js";
-import { JulesNetworkError, JulesResponseValidationError, mapResponseToError } from "./errors.js";
+import { JulesApiError, mapResponseToError } from "./errors.js";
 import { DEFAULT_RETRY_POLICY, retryWithBackoff, type RetryPolicy } from "./retry.js";
 
 const PROXY_ENV_VARS = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"];
@@ -50,7 +50,10 @@ export class JulesHttpClient {
     const raw = await this.rawJson(path, init);
     const parsed = schema.safeParse(raw);
     if (!parsed.success) {
-      throw new JulesResponseValidationError(path, parsed.error);
+      throw new JulesApiError(
+        `Response from ${path} did not match the expected schema: ${parsed.error.message}`,
+        { kind: "validation", path, zodError: parsed.error }
+      );
     }
     return parsed.data;
   }
@@ -78,8 +81,9 @@ export class JulesHttpClient {
         },
       });
     } catch (error) {
-      throw new JulesNetworkError(
-        `Network error connecting to Jules API: ${error instanceof Error ? error.message : String(error)}`
+      throw new JulesApiError(
+        `Network error connecting to Jules API: ${error instanceof Error ? error.message : String(error)}`,
+        { kind: "network" }
       );
     }
 

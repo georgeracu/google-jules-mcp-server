@@ -2,14 +2,7 @@ import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import {
-  JulesAuthError,
-  JulesNetworkError,
-  JulesNotFoundError,
-  JulesRateLimitError,
-  JulesResponseValidationError,
-  JulesServerError,
-} from "../../src/core/errors.js";
+import { JulesApiError } from "../../src/core/errors.js";
 import { JulesHttpClient } from "../../src/core/http-client.js";
 import { DEFAULT_RETRY_POLICY } from "../../src/core/retry.js";
 import { server } from "../msw/server.js";
@@ -44,7 +37,7 @@ describe("JulesHttpClient", () => {
     await expect(client.requestVoid("/void", { method: "POST" })).resolves.toBeUndefined();
   });
 
-  it("maps 404 to JulesNotFoundError", async () => {
+  it("maps 404 to JulesApiError with kind not_found", async () => {
     server.use(
       http.get(`${BASE}/missing`, () =>
         HttpResponse.json(
@@ -54,10 +47,12 @@ describe("JulesHttpClient", () => {
       )
     );
     const client = makeClient();
-    await expect(client.request("/missing", z.object({}))).rejects.toThrow(JulesNotFoundError);
+    await expect(client.request("/missing", z.object({}))).rejects.toSatisfy(
+      (error: unknown) => error instanceof JulesApiError && error.kind === "not_found"
+    );
   });
 
-  it("maps 401 to JulesAuthError", async () => {
+  it("maps 401 to JulesApiError with kind auth", async () => {
     server.use(
       http.get(`${BASE}/secure`, () =>
         HttpResponse.json(
@@ -67,7 +62,9 @@ describe("JulesHttpClient", () => {
       )
     );
     const client = makeClient();
-    await expect(client.request("/secure", z.object({}))).rejects.toThrow(JulesAuthError);
+    await expect(client.request("/secure", z.object({}))).rejects.toSatisfy(
+      (error: unknown) => error instanceof JulesApiError && error.kind === "auth"
+    );
   });
 
   it("retries a 429 and succeeds, honoring Retry-After", async () => {
@@ -90,7 +87,7 @@ describe("JulesHttpClient", () => {
     expect(attempts).toBe(2);
   });
 
-  it("exhausts retries on persistent 5xx and throws JulesServerError", async () => {
+  it("exhausts retries on persistent 5xx and throws JulesApiError with kind server", async () => {
     server.use(
       http.get(`${BASE}/broken`, () =>
         HttpResponse.json(
@@ -100,7 +97,9 @@ describe("JulesHttpClient", () => {
       )
     );
     const client = makeClient();
-    await expect(client.request("/broken", z.object({}))).rejects.toThrow(JulesServerError);
+    await expect(client.request("/broken", z.object({}))).rejects.toSatisfy(
+      (error: unknown) => error instanceof JulesApiError && error.kind === "server"
+    );
   });
 
   it("does not retry a 400 client error", async () => {
@@ -116,10 +115,12 @@ describe("JulesHttpClient", () => {
     expect(attempts).toBe(1);
   });
 
-  it("maps a network failure to JulesNetworkError", async () => {
+  it("maps a network failure to JulesApiError with kind network", async () => {
     server.use(http.get(`${BASE}/unreachable`, () => HttpResponse.error()));
     const client = makeClient();
-    await expect(client.request("/unreachable", z.object({}))).rejects.toThrow(JulesNetworkError);
+    await expect(client.request("/unreachable", z.object({}))).rejects.toSatisfy(
+      (error: unknown) => error instanceof JulesApiError && error.kind === "network"
+    );
   });
 
   describe("with a non-Error fetch rejection", () => {
@@ -134,11 +135,11 @@ describe("JulesHttpClient", () => {
     });
   });
 
-  it("throws JulesResponseValidationError when the response doesn't match the schema", async () => {
+  it("throws JulesApiError with kind validation when the response doesn't match the schema", async () => {
     server.use(http.get(`${BASE}/drifted`, () => HttpResponse.json({ unexpected: "shape" })));
     const client = makeClient();
-    await expect(client.request("/drifted", z.object({ expected: z.string() }))).rejects.toThrow(
-      JulesResponseValidationError
+    await expect(client.request("/drifted", z.object({ expected: z.string() }))).rejects.toSatisfy(
+      (error: unknown) => error instanceof JulesApiError && error.kind === "validation"
     );
   });
 
@@ -195,7 +196,7 @@ describe("JulesHttpClient", () => {
     });
   });
 
-  it("exposes retryAfterMs on JulesRateLimitError when retries are exhausted", async () => {
+  it("exposes retryAfterMs on JulesApiError with kind rate_limit when retries are exhausted", async () => {
     server.use(
       http.get(`${BASE}/still-limited`, () =>
         HttpResponse.json(
@@ -206,7 +207,8 @@ describe("JulesHttpClient", () => {
     );
     const client = new JulesHttpClient("k", BASE, { ...FAST_POLICY, maxAttempts: 1 });
     await expect(client.request("/still-limited", z.object({}))).rejects.toSatisfy(
-      (error: unknown) => error instanceof JulesRateLimitError && error.retryAfterMs === 1000
+      (error: unknown) =>
+        error instanceof JulesApiError && error.kind === "rate_limit" && error.retryAfterMs === 1000
     );
   });
 });
