@@ -24,6 +24,11 @@ describe("source tool handlers", () => {
             sources: [{ id: "github/acme/repo1", name: "sources/github/acme/repo1" }],
             nextPageToken: "token-2",
           });
+        } else if (requests === 2) {
+          return HttpResponse.json({
+            sources: undefined,
+            nextPageToken: "token-3",
+          });
         }
         return HttpResponse.json({
           sources: [{ id: "github/acme/repo2", name: "sources/github/acme/repo2" }],
@@ -36,7 +41,7 @@ describe("source tool handlers", () => {
     expect(result.content[0].text).toContain("Connected repositories (2)");
     expect(result.content[0].text).toContain("repo1");
     expect(result.content[0].text).toContain("repo2");
-    expect(requests).toBe(2);
+    expect(requests).toBe(3);
   });
 
   it("listSources returns an error result on failure", async () => {

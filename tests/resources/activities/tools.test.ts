@@ -29,6 +29,11 @@ describe("activity tool handlers", () => {
             ],
             nextPageToken: "token-2",
           });
+        } else if (requests === 2) {
+          return HttpResponse.json({
+            activities: undefined,
+            nextPageToken: "token-3",
+          });
         }
         return HttpResponse.json({
           activities: [
@@ -43,7 +48,7 @@ describe("activity tool handlers", () => {
     expect(result.content[0].text).toContain("Activities for session 1234567890 (2)");
     expect(result.content[0].text).toContain("a1");
     expect(result.content[0].text).toContain("a2");
-    expect(requests).toBe(2);
+    expect(requests).toBe(3);
   });
 
   it("listActivities returns an error result on failure", async () => {
