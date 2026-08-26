@@ -1,6 +1,14 @@
 import { formatActivitySummary, formatChangeSet } from "../activities/format.js";
 import type { ActivityList } from "../activities/schemas.js";
-import type { Session, SessionList } from "./schemas.js";
+import type { Session, SessionList, SessionState } from "./schemas.js";
+
+export const TERMINAL_STATES = [
+  "COMPLETED",
+  "FAILED",
+  "AWAITING_PLAN_APPROVAL",
+  "AWAITING_USER_FEEDBACK",
+  "PAUSED",
+] as const satisfies readonly SessionState[];
 
 export function formatSessionList(data: SessionList): string {
   if (!data.sessions || data.sessions.length === 0) {
@@ -73,25 +81,25 @@ export function formatSessionCreated(
   );
 }
 
+const GUIDANCE_BY_STATE: Record<SessionState, string> = {
+  COMPLETED: "\n\nSession complete! Use jules_get_session_output for detailed results.",
+  FAILED: "\n\nSession failed. Use jules_list_activities to see detailed error information.",
+  AWAITING_PLAN_APPROVAL:
+    "\n\nSession awaiting plan approval. Use jules_list_activities to see the plan, then jules_approve_plan to proceed.",
+  AWAITING_USER_FEEDBACK:
+    "\n\nSession is waiting on you. Use jules_list_activities to see what Jules is asking, then jules_send_message to respond.",
+  PAUSED: "\n\nSession is paused.",
+  QUEUED: "\n\nSession still running. Poll again in 10-30 seconds for updates.",
+  PLANNING: "\n\nSession still running. Poll again in 10-30 seconds for updates.",
+  IN_PROGRESS: "\n\nSession still running. Poll again in 10-30 seconds for updates.",
+  STATE_UNSPECIFIED: "",
+};
+
 function formatStateGuidance(session: Session): string {
-  switch (session.state) {
-    case "COMPLETED":
-      return "\n\nSession complete! Use jules_get_session_output for detailed results.";
-    case "FAILED":
-      return "\n\nSession failed. Use jules_list_activities to see detailed error information.";
-    case "AWAITING_PLAN_APPROVAL":
-      return "\n\nSession awaiting plan approval. Use jules_list_activities to see the plan, then jules_approve_plan to proceed.";
-    case "AWAITING_USER_FEEDBACK":
-      return "\n\nSession is waiting on you. Use jules_list_activities to see what Jules is asking, then jules_send_message to respond.";
-    case "PAUSED":
-      return "\n\nSession is paused.";
-    case "QUEUED":
-    case "PLANNING":
-    case "IN_PROGRESS":
-      return "\n\nSession still running. Poll again in 10-30 seconds for updates.";
-    default:
-      return "";
+  if (session.state && session.state in GUIDANCE_BY_STATE) {
+    return GUIDANCE_BY_STATE[session.state];
   }
+  return "";
 }
 
 export function formatSessionStatus(session: Session, activities: ActivityList): string {
@@ -167,6 +175,20 @@ export function formatSessionOutput(session: Session): string {
   );
 }
 
+const WAIT_RESOLUTION_SUMMARY_BY_STATE: Record<
+  Extract<SessionState, (typeof TERMINAL_STATES)[number]>,
+  (activities: ActivityList) => string
+> = {
+  COMPLETED: () => "Session completed successfully.\n",
+  FAILED: (activities) => {
+    const failReason = activities.activities?.find((a) => a.sessionFailed)?.sessionFailed?.reason;
+    return `Session failed.${failReason ? ` Reason: ${failReason}` : ""}\n`;
+  },
+  AWAITING_PLAN_APPROVAL: () => "The execution plan was generated and is awaiting your approval.\n",
+  AWAITING_USER_FEEDBACK: () => "Jules is waiting for user feedback/input.\n",
+  PAUSED: () => "The session has been paused.\n",
+};
+
 export function formatWaitResolution(session: Session, activities: ActivityList): string {
   let text = `Session Wait Resolved!\n\n`;
   text += `Session ID: ${session.id}\n`;
@@ -175,26 +197,15 @@ export function formatWaitResolution(session: Session, activities: ActivityList)
   text += `Prompt: ${session.prompt}\n\n`;
 
   text += "Summary: ";
-  switch (session.state) {
-    case "COMPLETED":
-      text += "Session completed successfully.\n";
-      break;
-    case "FAILED": {
-      const failReason = activities.activities?.find((a) => a.sessionFailed)?.sessionFailed?.reason;
-      text += `Session failed.${failReason ? ` Reason: ${failReason}` : ""}\n`;
-      break;
-    }
-    case "AWAITING_PLAN_APPROVAL":
-      text += "The execution plan was generated and is awaiting your approval.\n";
-      break;
-    case "AWAITING_USER_FEEDBACK":
-      text += "Jules is waiting for user feedback/input.\n";
-      break;
-    case "PAUSED":
-      text += "The session has been paused.\n";
-      break;
-    default:
-      text += `Session reached state ${session.state}.\n`;
+  if (
+    session.state &&
+    (TERMINAL_STATES as readonly string[]).includes(session.state) &&
+    session.state in WAIT_RESOLUTION_SUMMARY_BY_STATE
+  ) {
+    const stateKey = session.state as (typeof TERMINAL_STATES)[number];
+    text += WAIT_RESOLUTION_SUMMARY_BY_STATE[stateKey](activities);
+  } else {
+    text += `Session reached state ${session.state}.\n`;
   }
 
   const prs = session.outputs

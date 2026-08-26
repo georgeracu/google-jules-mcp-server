@@ -1,13 +1,5 @@
 import type { Source, SourceList } from "./schemas.js";
 
-function formatSourceSummary(source: Source): string {
-  const repo = source.githubRepo;
-  if (!repo) return `- ${source.name} (${source.id})`;
-  const privacy = repo.isPrivate ? "private" : "public";
-  const branches = repo.branches?.map((b) => b.displayName).join(", ") || "unknown";
-  return `- ${repo.owner}/${repo.repo} (${privacy})\n  Branches: ${branches}\n  Source name: ${source.name}`;
-}
-
 export function formatSourceList(data: SourceList): string {
   if (!data.sources || data.sources.length === 0) {
     return (
@@ -20,7 +12,7 @@ export function formatSourceList(data: SourceList): string {
     );
   }
 
-  const sourcesList = data.sources.map(formatSourceSummary).join("\n\n");
+  const sourcesList = data.sources.map((s) => formatSource(s, { summary: true })).join("\n\n");
   let response = `Connected repositories (${data.sources.length}):\n\n${sourcesList}`;
   if (data.nextPageToken) {
     response += `\n\nMore results available. Use pageToken: ${data.nextPageToken}`;
@@ -28,13 +20,22 @@ export function formatSourceList(data: SourceList): string {
   return response;
 }
 
-export function formatSource(source: Source): string {
+export function formatSource(source: Source, options?: { summary?: boolean }): string {
   const repo = source.githubRepo;
-  if (!repo) return `${source.name} (${source.id})`;
+  if (!repo)
+    return options?.summary ? `- ${source.name} (${source.id})` : `${source.name} (${source.id})`;
+
+  const privacy = repo.isPrivate ? "private" : "public";
+  const branches = repo.branches?.map((b) => b.displayName).join(", ") || "unknown";
+
+  if (options?.summary) {
+    return `- ${repo.owner}/${repo.repo} (${privacy})\n  Branches: ${branches}\n  Source name: ${source.name}`;
+  }
+
   return (
-    `${repo.owner}/${repo.repo} (${repo.isPrivate ? "private" : "public"})\n` +
+    `${repo.owner}/${repo.repo} (${privacy})\n` +
     `Default branch: ${repo.defaultBranch?.displayName || "unknown"}\n` +
-    `Branches: ${repo.branches?.map((b) => b.displayName).join(", ") || "unknown"}\n` +
+    `Branches: ${branches}\n` +
     `Source name: ${source.name}`
   );
 }
