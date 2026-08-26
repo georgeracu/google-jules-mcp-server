@@ -24,12 +24,16 @@ describe("activity tool handlers", () => {
         requests++;
         if (requests === 1) {
           return HttpResponse.json({
-            activities: [{ name: "sessions/1234567890/activities/a1", id: "a1", description: "Activity a1" }],
+            activities: [
+              { name: "sessions/1234567890/activities/a1", id: "a1", description: "Activity a1" },
+            ],
             nextPageToken: "token-2",
           });
         }
         return HttpResponse.json({
-          activities: [{ name: "sessions/1234567890/activities/a2", id: "a2", description: "Activity a2" }],
+          activities: [
+            { name: "sessions/1234567890/activities/a2", id: "a2", description: "Activity a2" },
+          ],
         });
       })
     );
