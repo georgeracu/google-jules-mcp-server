@@ -40,30 +40,31 @@ Formatting and lint rules are enforced by Prettier and ESLint (`npm run format`,
 
 ## Commit messages
 
-Clear, imperative summary of what changed and why (e.g. `Add retry backoff for 429 responses`). No required prefix convention.
+Follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`,
+`chore:`, `ci:`, `test:`, `build:`, etc.) — [release-please](https://github.com/googleapis/release-please)
+reads these to decide the next version and to write the changelog, so an unprefixed or
+mislabelled commit either fails to bump the version or lands in the wrong changelog section.
+This repo merges via merge commit rather than squash, so every individual commit on `main` is
+read, not just the PR title.
 
 ## Releasing
 
-Publishing to npm is automated via `.github/workflows/release.yml`, triggered by pushing a `vX.Y.Z` tag that matches `package.json`'s version. `main` requires a PR (no direct pushes, even for admins), so the version bump has to land before the tag:
+Versioning and changelog generation are automated by
+[release-please](https://github.com/googleapis/release-please)
+(config in [`release-please-config.json`](release-please-config.json), current version tracked in
+[`.release-please-manifest.json`](.release-please-manifest.json)). On every push to `main`,
+[`.github/workflows/release-please.yml`](.github/workflows/release-please.yml) either opens or
+updates a standing "chore(release): x.y.z" pull request containing the version bump (`package.json`,
+`package-lock.json`, `server.json`) and the generated `CHANGELOG.md` entry.
 
-```bash
-git checkout -b release/vX.Y.Z
-npm version patch --no-git-tag-version   # or minor / major — bumps package.json only
-git commit -am "vX.Y.Z"
-git push -u origin release/vX.Y.Z
-gh pr create --fill
-```
+Review and merge that PR like any other — `main`'s branch protection (required PR, required
+`build-and-test` check, no admin bypass) applies to it the same as everything else. Merging it
+is what triggers the release: release-please creates the GitHub Release and pushes the `vX.Y.Z`
+tag, which in turn triggers [`.github/workflows/release.yml`](.github/workflows/release.yml) to
+`npm publish` and publish to the MCP Registry.
 
-Once that PR merges:
-
-```bash
-git checkout main && git pull
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
-
-Tag pushes aren't covered by `main`'s branch protection, so this last step doesn't need a PR.
-
-The workflow re-runs lint/typecheck/tests/build (via `prepublishOnly`) and refuses to publish if the tag doesn't match `package.json`'s version, then runs `npm publish`. Authentication is via npm's [Trusted Publisher](https://docs.npmjs.com/trusted-publishers) (OIDC) — no stored npm token, and provenance attestation is generated automatically. This requires a one-time setup on npmjs.com: package Settings → Trusted Publisher → GitHub Actions, with organization/user `georgeracu`, repository `google-jules-mcp-server`, workflow filename `release.yml`, no environment.
-
-After publishing, the workflow also creates a GitHub Release for the tag with auto-generated notes (`gh release create --generate-notes`), grouped into categories by PR label per `.github/release.yml` (Dependabot PRs are auto-labeled `dependencies`; use `enhancement`/`bug`/`breaking-change` on your own PRs to get them categorized correctly).
+Authentication for npm is via npm's [Trusted Publisher](https://docs.npmjs.com/trusted-publishers)
+(OIDC) — no stored npm token, and provenance attestation is generated automatically. This requires
+a one-time setup on npmjs.com: package Settings → Trusted Publisher → GitHub Actions, with
+organization/user `georgeracu`, repository `google-jules-mcp-server`, workflow filename
+`release.yml`, no environment.
