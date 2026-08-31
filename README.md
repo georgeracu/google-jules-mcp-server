@@ -5,6 +5,7 @@
 [![npm version](https://img.shields.io/npm/v/google-jules-mcp-server.svg)](https://www.npmjs.com/package/google-jules-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-google--jules--mcp--server-blue)](https://registry.modelcontextprotocol.io/?search=google-jules-mcp-server)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/georgeracu/google-jules-mcp-server)
+[![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/georgeracu/google-jules-mcp-server?utm_source=oss&utm_medium=github&utm_campaign=georgeracu%2Fgoogle-jules-mcp-server&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)](https://coderabbit.ai)
 
 If you're searching for a way to drive Google's Jules coding agent from Claude, Cursor, VS Code Copilot, or any other MCP client, this is that bridge. `google-jules-mcp-server` is an unofficial Model Context Protocol server that exposes the full Jules API (v1alpha) as 13 tools, so your assistant can create sessions, poll status, approve plans, and fetch the resulting pull request without you leaving the chat.
 
@@ -176,7 +177,7 @@ If you installed globally instead, replace `"command": "npx", "args": ["-y", "go
 
 If you're running from a local clone instead, use `"command": "node", "args": ["/absolute/path/to/google-jules-mcp-server/build/index.js"]` (an absolute path to `build/index.js`).
 
-**Behind a corporate proxy** — the server honours the standard `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` variables, and there is nothing to configure on the server itself. What catches people out is that your MCP client spawns the server as a child process, so a variable exported in `~/.zshrc` never reaches a GUI-launched app. Set it in the same `env` block as your API key:
+**Behind a corporate proxy** — to support enterprise/corporate proxy setups without requiring any server-side config, the server automatically picks up proxy settings from the environment. The underlying `EnvHttpProxyAgent` (from `undici`) honours the standard `HTTPS_PROXY`, `https_proxy`, `HTTP_PROXY`, `http_proxy`, and `NO_PROXY` variables. What catches people out is that your MCP client spawns the server as a child process, so a variable exported in `~/.zshrc` never reaches a GUI-launched app. Set it in the same `env` block as your API key:
 
 ```json
 {
@@ -247,6 +248,88 @@ Pagination itself is unaffected by any of this. `jules_list_sources`, `jules_lis
 4. **Retrieve** the pull request URL once state is `COMPLETED`, via `jules_get_session_output`.
 
 Your assistant handles this polling loop automatically when asked to monitor a task.
+
+### Session Watcher (Stuck Sessions)
+
+If you don't want your LLM client burning tokens polling for stuck sessions (e.g. `AWAITING_PLAN_APPROVAL` or `AWAITING_USER_FEEDBACK`), you can run the standalone session watcher. It runs independently of any MCP client and posts a JSON payload to a webhook when a session gets stuck.
+
+**Required environment variables:**
+
+- `JULES_API_KEY`: Your Jules API key.
+- `JULES_WATCH_WEBHOOK_URL`: The URL to POST the JSON payload to.
+
+**Optional environment variables:**
+
+- `JULES_WATCH_INTERVAL_SECONDS`: The polling interval in seconds (default: `60`).
+
+The payload structure:
+
+```json
+{
+  "id": "session_id_here",
+  "title": "Session Title",
+  "state": "AWAITING_PLAN_APPROVAL",
+  "url": "https://jules.google.com/session_url"
+}
+```
+
+**Running the watcher:**
+
+_Via npx:_
+
+```bash
+JULES_API_KEY=your_key JULES_WATCH_WEBHOOK_URL=https://hooks.slack.com/services/... npx -y google-jules-mcp-server watch
+```
+
+_Via local clone:_
+
+```bash
+JULES_API_KEY=your_key JULES_WATCH_WEBHOOK_URL=https://hooks.slack.com/services/... node build/index.js watch
+```
+
+_Example PM2 configuration (`ecosystem.config.js`):_
+
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: "jules-watcher",
+      script: "npx",
+      args: "google-jules-mcp-server watch",
+      env: {
+        JULES_API_KEY: "your_key",
+        JULES_WATCH_WEBHOOK_URL: "https://your.webhook.url/here",
+        JULES_WATCH_INTERVAL_SECONDS: "60",
+      },
+    },
+  ],
+};
+```
+
+_Example systemd service (`/etc/systemd/system/jules-watcher.service`):_
+
+```ini
+[Unit]
+Description=Jules Session Watcher
+
+[Service]
+ExecStart=/usr/bin/npx google-jules-mcp-server watch
+Environment="JULES_API_KEY=your_key"
+Environment="JULES_WATCH_WEBHOOK_URL=https://your.webhook.url/here"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+_Example Docker one-liner:_
+
+```bash
+docker run -d --name jules-watcher \
+  -e JULES_API_KEY=your_key \
+  -e JULES_WATCH_WEBHOOK_URL=https://your.webhook.url/here \
+  node:22 npx -y google-jules-mcp-server watch
+```
 
 ## Rate Limits and Quotas
 

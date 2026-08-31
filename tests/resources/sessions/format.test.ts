@@ -183,6 +183,14 @@ describe("formatSessionStatus", () => {
     );
     expect(text.endsWith("No activities yet - session starting up.")).toBe(true);
   });
+
+  it("returns empty guidance when session.state is missing", () => {
+    const text = formatSessionStatus(
+      { ...sessionAwaitingPlanApprovalFixture, state: undefined },
+      {}
+    );
+    expect(text.endsWith("No activities yet - session starting up.")).toBe(true);
+  });
 });
 
 describe("formatSessionOutput", () => {
@@ -379,6 +387,7 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
       "AWAITING_USER_FEEDBACK",
       "PAUSED",
       "QUEUED",
+      undefined,
     ] as const;
     for (const state of states) {
       const text = formatWaitResolution({ ...sessionCompletedFixture, state }, activityListFixture);

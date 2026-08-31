@@ -1,4 +1,4 @@
-import { JulesNetworkError, JulesRateLimitError, JulesServerError } from "./errors.js";
+import { JulesApiError } from "./errors.js";
 
 export interface RetryPolicy {
   maxAttempts: number;
@@ -13,10 +13,10 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
   baseDelayMs: 250,
   maxDelayMs: 5000,
   isRetryable: (error) =>
-    error instanceof JulesRateLimitError ||
-    error instanceof JulesServerError ||
-    error instanceof JulesNetworkError,
-  retryAfterMs: (error) => (error instanceof JulesRateLimitError ? error.retryAfterMs : undefined),
+    error instanceof JulesApiError &&
+    (error.kind === "rate_limit" || error.kind === "server" || error.kind === "network"),
+  retryAfterMs: (error) =>
+    error instanceof JulesApiError && error.kind === "rate_limit" ? error.retryAfterMs : undefined,
 };
 
 function sleep(ms: number): Promise<void> {
