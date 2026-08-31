@@ -52,16 +52,20 @@ read, not just the PR title.
 Versioning and changelog generation are automated by
 [release-please](https://github.com/googleapis/release-please)
 (config in [`release-please-config.json`](release-please-config.json), current version tracked in
-[`.release-please-manifest.json`](.release-please-manifest.json)). On every push to `main`,
-[`.github/workflows/release-please.yml`](.github/workflows/release-please.yml) either opens or
-updates a standing "chore(release): x.y.z" pull request containing the version bump (`package.json`,
-`package-lock.json`, `server.json`) and the generated `CHANGELOG.md` entry.
+[`.release-please-manifest.json`](.release-please-manifest.json)). On every push to `main`, the
+`release-please` job in [`.github/workflows/release.yml`](.github/workflows/release.yml) either
+opens or updates a standing "chore(release): x.y.z" pull request containing the version bump
+(`package.json`, `package-lock.json`, `server.json`) and the generated `CHANGELOG.md` entry.
 
 Review and merge that PR like any other — `main`'s branch protection (required PR, required
 `build-and-test` check, no admin bypass) applies to it the same as everything else. Merging it
 is what triggers the release: release-please creates the GitHub Release and pushes the `vX.Y.Z`
-tag, which in turn triggers [`.github/workflows/release.yml`](.github/workflows/release.yml) to
-`npm publish` and publish to the MCP Registry.
+tag. That same workflow run's `publish` job (gated on the `release-please` job's
+`release_created` output) then checks out the new tag, runs `npm publish`, and publishes to the
+MCP Registry. It's a second job in the same workflow rather than a separate tag-triggered one
+because release-please authenticates with the default `GITHUB_TOKEN`, and GitHub doesn't let a
+`GITHUB_TOKEN`-authenticated push trigger another workflow run — a separate tag-triggered
+workflow would simply never fire.
 
 Authentication for npm is via npm's [Trusted Publisher](https://docs.npmjs.com/trusted-publishers)
 (OIDC) — no stored npm token, and provenance attestation is generated automatically. This requires
