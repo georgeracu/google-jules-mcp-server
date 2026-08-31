@@ -178,9 +178,9 @@ describe("formatActivityList", () => {
     expect(text).toContain("Steps:");
   });
 
-  it("includes the next page token when present", () => {
+  it("notifies when the output limit is reached", () => {
     const text = formatActivityList(activityListFixture, "sess-1");
-    expect(text).toContain(`pageToken: ${activityListFixture.nextPageToken}`);
+    expect(text).toContain(`Re-run with a higher limit if needed.`);
   });
 
   it("never falls through to the generic fallback for a known variant", () => {
@@ -412,7 +412,7 @@ describe("output caps", () => {
       agentMessaged: { agentMessage: longText(5000) },
     }));
     const text = formatActivityList({ activities, nextPageToken: "tok" }, "sess-1");
-    expect(text).toContain("pageToken skips past all 40");
+    expect(text).toContain("Re-run with a higher limit if needed");
   });
 
   it("says nothing about capping when everything fits", () => {

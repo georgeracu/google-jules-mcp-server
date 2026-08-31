@@ -15,9 +15,9 @@ describe("formatSourceList", () => {
     expect(text).toContain(sourceFixture.name);
   });
 
-  it("includes the next page token when present", () => {
+  it("notifies when the output limit is reached", () => {
     const text = formatSourceList(sourceListFixture);
-    expect(text).toContain(`pageToken: ${sourceListFixture.nextPageToken}`);
+    expect(text).toContain(`output limit was reached`);
   });
 
   it("falls back to name/id when githubRepo is absent", () => {

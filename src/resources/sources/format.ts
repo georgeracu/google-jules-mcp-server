@@ -15,7 +15,7 @@ export function formatSourceList(data: SourceList): string {
   const sourcesList = data.sources.map((s) => formatSource(s, { summary: true })).join("\n\n");
   let response = `Connected repositories (${data.sources.length}):\n\n${sourcesList}`;
   if (data.nextPageToken) {
-    response += `\n\nMore results available. Use pageToken: ${data.nextPageToken}`;
+    response += `\n\nMore results available, but the output limit was reached.`;
   }
   return response;
 }

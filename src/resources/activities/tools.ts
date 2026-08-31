@@ -10,15 +10,30 @@ export function createActivityHandlers(client: ActivitiesClient) {
     listActivities: ({
       sessionId,
       limit,
-      pageToken,
     }: {
       sessionId: string;
       limit: number;
-      pageToken?: string;
     }): Promise<ToolResult> =>
       wrap("Error listing activities", async () => {
-        const data = await client.listActivities(sessionId, { pageSize: limit, pageToken });
-        return textResult(formatActivityList(data, sessionId));
+        const activities = [];
+        let pageToken: string | undefined;
+
+        for (let page = 0; page < 10; page++) {
+          const pageSize = Math.max(1, Math.min(50, limit - activities.length));
+          const data = await client.listActivities(sessionId, { pageSize, pageToken });
+          activities.push(...(data.activities ?? []));
+
+          if (activities.length >= limit) {
+            activities.splice(limit);
+            pageToken = data.nextPageToken;
+            break;
+          }
+
+          pageToken = data.nextPageToken;
+          if (!pageToken) break;
+        }
+
+        return textResult(formatActivityList({ activities, nextPageToken: pageToken }, sessionId));
       }),
 
     getActivity: ({
@@ -47,7 +62,6 @@ export function registerActivityTools(server: McpServer, client: ActivitiesClien
       inputSchema: {
         sessionId: z.string().describe("Session ID to get activities for"),
         limit: z.number().default(10).describe("Number of activities to retrieve (default: 10)"),
-        pageToken: z.string().optional().describe("Token for pagination to get the next page"),
       },
     },
     handlers.listActivities
