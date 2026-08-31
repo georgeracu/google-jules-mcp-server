@@ -1,14 +1,13 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { formatErrorForUser } from "../../core/errors.js";
-import { errorResult, textResult, type ToolResult } from "../../core/tool-result.js";
+import { textResult, wrap, type ToolResult } from "../../core/tool-result.js";
 import type { ActivitiesClient } from "./client.js";
 import { formatActivityDetail, formatActivityList } from "./format.js";
 
 export function createActivityHandlers(client: ActivitiesClient) {
   return {
-    listActivities: async ({
+    listActivities: ({
       sessionId,
       limit,
       pageToken,
@@ -16,29 +15,23 @@ export function createActivityHandlers(client: ActivitiesClient) {
       sessionId: string;
       limit: number;
       pageToken?: string;
-    }): Promise<ToolResult> => {
-      try {
+    }): Promise<ToolResult> =>
+      wrap("Error listing activities", async () => {
         const data = await client.listActivities(sessionId, { pageSize: limit, pageToken });
         return textResult(formatActivityList(data, sessionId));
-      } catch (error) {
-        return errorResult(`Error listing activities: ${formatErrorForUser(error)}`);
-      }
-    },
+      }),
 
-    getActivity: async ({
+    getActivity: ({
       sessionId,
       activityId,
     }: {
       sessionId: string;
       activityId: string;
-    }): Promise<ToolResult> => {
-      try {
+    }): Promise<ToolResult> =>
+      wrap("Error getting activity", async () => {
         const activity = await client.getActivity(sessionId, activityId);
         return textResult(formatActivityDetail(activity));
-      } catch (error) {
-        return errorResult(`Error getting activity: ${formatErrorForUser(error)}`);
-      }
-    },
+      }),
   };
 }
 
