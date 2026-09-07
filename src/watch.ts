@@ -20,12 +20,17 @@ export async function pollStuckSessions(
       const data = await sessionsClient.listSessions({ pageSize: 50, pageToken });
       const pageSessions = (data.sessions ?? []).slice(0, 500 - sessionsScanned);
       sessionsScanned += pageSessions.length;
-      stuckSessions.push(
-        ...pageSessions.filter(
-          (session) =>
-            session.state === "AWAITING_PLAN_APPROVAL" || session.state === "AWAITING_USER_FEEDBACK"
-        )
-      );
+      for (const session of pageSessions) {
+        if (
+          session.state === "AWAITING_PLAN_APPROVAL" ||
+          session.state === "AWAITING_USER_FEEDBACK"
+        ) {
+          stuckSessions.push(session);
+        } else {
+          // A later re-entry into a stuck state should notify again.
+          seenStates.delete(session.id);
+        }
+      }
 
       pageToken = data.nextPageToken;
       if (!pageToken) break;
