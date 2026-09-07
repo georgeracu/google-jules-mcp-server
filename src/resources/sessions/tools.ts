@@ -5,6 +5,7 @@ import type { ActivitiesClient } from "../activities/client.js";
 import { textResult, wrap, type ToolResult } from "../../core/tool-result.js";
 import { PageParams } from "../../shared/pagination.js";
 import type { SessionsClient } from "./client.js";
+import type { SessionScheduler } from "./scheduler.js";
 import {
   formatSessionCreated,
   formatSessionList,
@@ -36,7 +37,7 @@ interface WaitExtra {
 const SESSION_CREATE_ERR_TEXT =
   "Common issues:\n- Repository not connected to Jules (run jules_list_sources)\n- Invalid repository owner/name\n- Branch does not exist";
 
-function buildSessionRequest({
+export function buildSessionRequest({
   repoOwner,
   repoName,
   prompt,
@@ -65,7 +66,11 @@ function buildSessionRequest({
   });
 }
 
-export function createSessionHandlers(sessions: SessionsClient, activities: ActivitiesClient) {
+export function createSessionHandlers(
+  sessions: SessionsClient,
+  activities: ActivitiesClient,
+  scheduler?: SessionScheduler
+) {
   const pollSession = async (
     sessionId: string,
     maxWaitSeconds: number,
@@ -240,6 +245,48 @@ ${SESSION_CREATE_ERR_TEXT}`
 ${SESSION_CREATE_ERR_TEXT}`
       ),
 
+    scheduleRecurringSession: async (input: {
+      cron: string;
+      repoOwner: string;
+      repoName: string;
+      prompt: string;
+      branch: string;
+      autoApprove: boolean;
+      autoCreatePR: boolean;
+      title?: string;
+    }): Promise<ToolResult> =>
+      wrap("Error scheduling session", async () => {
+        if (!scheduler) throw new Error("Session scheduler is unavailable");
+        const schedule = await scheduler.add(input.cron, buildSessionRequest(input));
+        return textResult(
+          `Recurring session scheduled.\n\nSchedule ID: ${schedule.id}\nCron: ${schedule.cron}`
+        );
+      }),
+    listRecurringSchedules: (): Promise<ToolResult> =>
+      wrap("Error listing schedules", () => {
+        if (!scheduler) throw new Error("Session scheduler is unavailable");
+        const schedules = scheduler.list();
+        return Promise.resolve(
+          textResult(
+            schedules.length
+              ? schedules
+                  .map((x) => `${x.id} — ${x.cron} — ${x.request.sourceContext.source}`)
+                  .join("\n")
+              : "No recurring schedules found."
+          )
+        );
+      }),
+    cancelRecurringSchedule: ({ scheduleId }: { scheduleId: string }): Promise<ToolResult> =>
+      wrap("Error cancelling schedule", async () => {
+        if (!scheduler) throw new Error("Session scheduler is unavailable");
+        const removed = await scheduler.remove(scheduleId);
+        return textResult(
+          removed
+            ? `Recurring schedule ${scheduleId} cancelled.`
+            : `Schedule ${scheduleId} was not found.`
+        );
+      }),
+
     listSessions: ({
       pageSize,
       pageToken,
@@ -353,9 +400,10 @@ State: ${session.state}`);
 export function registerSessionTools(
   server: McpServer,
   sessions: SessionsClient,
-  activities: ActivitiesClient
+  activities: ActivitiesClient,
+  scheduler?: SessionScheduler
 ): void {
-  const handlers = createSessionHandlers(sessions, activities);
+  const handlers = createSessionHandlers(sessions, activities, scheduler);
   const sessionIdField = z.string().describe("Session ID");
 
   server.registerTool(
@@ -415,6 +463,44 @@ export function registerSessionTools(
       },
     },
     handlers.listStuckSessions
+  );
+
+  const recurringInput = {
+    cron: z.string().describe("Cron expression"),
+    repoOwner: z.string(),
+    repoName: z.string(),
+    prompt: z.string(),
+    branch: z.string().default("main"),
+    autoApprove: z.boolean().default(true),
+    autoCreatePR: z.boolean().default(false),
+    title: z.string().optional(),
+  };
+  server.registerTool(
+    "jules_schedule_recurring_session",
+    {
+      title: "Schedule Recurring Jules Session",
+      description: "Create a persistent cron schedule for recurring Jules sessions.",
+      inputSchema: recurringInput,
+    },
+    handlers.scheduleRecurringSession
+  );
+  server.registerTool(
+    "jules_list_recurring_schedules",
+    {
+      title: "List Recurring Jules Schedules",
+      description: "List persistent recurring session schedules.",
+      inputSchema: {},
+    },
+    handlers.listRecurringSchedules
+  );
+  server.registerTool(
+    "jules_cancel_recurring_schedule",
+    {
+      title: "Cancel Recurring Jules Schedule",
+      description: "Cancel a recurring session schedule.",
+      inputSchema: { scheduleId: z.string() },
+    },
+    handlers.cancelRecurringSchedule
   );
 
   server.registerTool(

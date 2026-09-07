@@ -345,7 +345,7 @@ describe("session tool handlers", () => {
 });
 
 describe("registerSessionTools", () => {
-  it("registers all 12 session tools with a working handler", async () => {
+  it("registers all 15 session tools with a working handler", async () => {
     const mcpServer = new McpServer({ name: "test", version: "0.0.0" });
     const registerSpy = vi.spyOn(mcpServer, "registerTool");
     const httpClient = new JulesHttpClient("test-key", BASE);
@@ -361,6 +361,9 @@ describe("registerSessionTools", () => {
       "jules_create_session",
       "jules_list_sessions",
       "jules_list_stuck_sessions",
+      "jules_schedule_recurring_session",
+      "jules_list_recurring_schedules",
+      "jules_cancel_recurring_schedule",
       "jules_get_status",
       "jules_send_message",
       "jules_approve_plan",
@@ -372,7 +375,7 @@ describe("registerSessionTools", () => {
       "jules_execute_and_wait",
     ]);
 
-    const getStatusHandler = registerSpy.mock.calls[3][2] as (args: object) => Promise<{
+    const getStatusHandler = registerSpy.mock.calls[6][2] as (args: object) => Promise<{
       content: Array<{ text: string }>;
     }>;
     const result = await getStatusHandler({ sessionId: "1234567890", includeActivities: 3 });
@@ -631,5 +634,56 @@ describe("jules_wait_for_session and jules_execute_and_wait", () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("Error creating session");
+  });
+});
+
+describe("recurring session tool handlers", () => {
+  const scheduler = {
+    add: vi.fn().mockResolvedValue({ id: "schedule-1", cron: "* * * * *" }),
+    list: vi.fn().mockReturnValue([]),
+    remove: vi.fn().mockResolvedValue(true),
+  };
+
+  function handlers() {
+    return createSessionHandlers({} as SessionsClient, {} as ActivitiesClient, scheduler as never);
+  }
+
+  it("schedules, lists, and cancels recurring sessions", async () => {
+    const h = handlers();
+    const scheduled = await h.scheduleRecurringSession({ ...baseCreateInput, cron: "* * * * *" });
+    expect(scheduled.content[0].text).toContain("schedule-1");
+    expect(scheduler.add).toHaveBeenCalled();
+
+    scheduler.list.mockReturnValue([
+      {
+        id: "schedule-1",
+        cron: "* * * * *",
+        request: { sourceContext: { source: "sources/github/acme/app" } },
+      },
+    ]);
+    const listed = await h.listRecurringSchedules();
+    expect(listed.content[0].text).toContain("schedule-1");
+
+    const cancelled = await h.cancelRecurringSchedule({ scheduleId: "schedule-1" });
+    expect(cancelled.content[0].text).toContain("cancelled");
+  });
+
+  it("lists an empty schedule set and reports missing cancellation", async () => {
+    const h = handlers();
+    scheduler.list.mockReturnValueOnce([]);
+    expect((await h.listRecurringSchedules()).content[0].text).toContain("No recurring schedules");
+    scheduler.remove.mockResolvedValueOnce(false);
+    expect((await h.cancelRecurringSchedule({ scheduleId: "missing" })).content[0].text).toContain(
+      "not found"
+    );
+  });
+
+  it("returns errors when the scheduler is unavailable", async () => {
+    const h = createSessionHandlers({} as SessionsClient, {} as ActivitiesClient);
+    expect(
+      (await h.scheduleRecurringSession({ ...baseCreateInput, cron: "* * * * *" })).isError
+    ).toBe(true);
+    expect((await h.listRecurringSchedules()).isError).toBe(true);
+    expect((await h.cancelRecurringSchedule({ scheduleId: "missing" })).isError).toBe(true);
   });
 });

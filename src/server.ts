@@ -6,6 +6,7 @@ import { ActivitiesClient } from "./resources/activities/client.js";
 import { registerActivityTools } from "./resources/activities/tools.js";
 import { SessionsClient } from "./resources/sessions/client.js";
 import { registerSessionTools } from "./resources/sessions/tools.js";
+import { SessionScheduler } from "./resources/sessions/scheduler.js";
 import { SourcesClient } from "./resources/sources/client.js";
 import { registerSourceTools } from "./resources/sources/tools.js";
 
@@ -19,6 +20,9 @@ export const TOOL_NAMES = [
   "jules_create_session",
   "jules_list_sessions",
   "jules_list_stuck_sessions",
+  "jules_schedule_recurring_session",
+  "jules_list_recurring_schedules",
+  "jules_cancel_recurring_schedule",
   "jules_get_status",
   "jules_send_message",
   "jules_approve_plan",
@@ -41,7 +45,9 @@ export function createServer(apiKey: string): McpServer {
   const activities = new ActivitiesClient(http);
 
   registerSourceTools(server, sources);
-  registerSessionTools(server, sessions, activities);
+  const scheduler = new SessionScheduler(sessions);
+  void scheduler.start();
+  registerSessionTools(server, sessions, activities, scheduler);
   registerActivityTools(server, activities);
 
   return server;
