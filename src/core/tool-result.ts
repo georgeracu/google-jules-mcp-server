@@ -1,4 +1,5 @@
 import { formatErrorForUser } from "./errors.js";
+import { sanitizeText } from "./sanitize.js";
 
 export interface ToolResult {
   [key: string]: unknown;
@@ -7,11 +8,11 @@ export interface ToolResult {
 }
 
 export function textResult(text: string): ToolResult {
-  return { content: [{ type: "text", text }] };
+  return { content: [{ type: "text", text: sanitizeText(text) }] };
 }
 
 export function errorResult(text: string): ToolResult {
-  return { content: [{ type: "text", text }], isError: true };
+  return { content: [{ type: "text", text: sanitizeText(text) }], isError: true };
 }
 
 export async function wrap(
