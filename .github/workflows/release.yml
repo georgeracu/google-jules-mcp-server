@@ -2,18 +2,36 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*.*.*"
-
-permissions:
-  contents: write
-  id-token: write
+    branches: [main]
 
 jobs:
-  publish:
+  release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
 
       - uses: actions/setup-node@v7
         with:
@@ -27,27 +45,15 @@ jobs:
 
       - run: npm ci
 
-      - name: Verify tag matches package.json version
+      - name: Publish to npm if needed
         run: |
-          tag_version="${GITHUB_REF_NAME#v}"
-          pkg_version="$(node -p "require('./package.json').version")"
-          if [ "$tag_version" != "$pkg_version" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $pkg_version"
-            exit 1
+          name="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "$name@$version is already published"
+          else
+            npm publish --access public
           fi
-
-      - run: npm publish --access public
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"
-
-      - name: Sync server.json version with package.json
-        run: |
-          tag_version="${GITHUB_REF_NAME#v}"
-          jq --arg v "$tag_version" '.version = $v | .packages[0].version = $v' server.json > server.tmp
-          mv server.tmp server.json
 
       - uses: sigstore/cosign-installer@v3
 

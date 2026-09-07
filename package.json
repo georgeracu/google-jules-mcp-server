@@ -25,7 +25,6 @@
     "test:coverage": "vitest run --coverage",
     "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "inspector": "npx @modelcontextprotocol/inspector node build/index.js",
-    "version": "node scripts/sync-server-json.mjs && git add server.json",
     "prepublishOnly": "npm run lint && npm run typecheck && npm run test:coverage && npm run build"
   },
   "keywords": [
