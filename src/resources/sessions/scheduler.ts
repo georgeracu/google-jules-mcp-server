@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 
 import { logger } from "../../core/logger.js";
+import { isRepositoryAllowed } from "../../core/config.js";
 import os from "node:os";
 import path from "node:path";
 
@@ -78,6 +79,12 @@ export class SessionScheduler {
 
   private async fire(schedule: RecurringSchedule): Promise<void> {
     try {
+      const source = schedule.request.sourceContext?.source;
+      const match = source?.match(/^sources\/github\/([^/]+)\/([^/]+)$/);
+      if (match && !isRepositoryAllowed(match[1], match[2])) {
+        logger.error(`Recurring session ${schedule.id} skipped: repository is not permitted`);
+        return;
+      }
       await this.sessions.createSession(schedule.request);
     } catch (error) {
       logger.error(`Recurring session ${schedule.id} failed:`, error);
