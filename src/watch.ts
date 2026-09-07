@@ -3,6 +3,7 @@ import { JulesHttpClient } from "./core/http-client.js";
 import { logger } from "./core/logger.js";
 import { SessionsClient } from "./resources/sessions/client.js";
 import type { Session } from "./resources/sessions/schemas.js";
+import { pathToFileURL } from "node:url";
 
 // Exported for testing
 export async function pollStuckSessions(
@@ -110,5 +111,14 @@ export async function startWatcher(): Promise<never> {
   // Return a never-resolving promise to keep the process alive
   return new Promise(() => {
     // Keep alive
+  });
+}
+
+// Support running the compiled watcher directly (`node build/watch.js`) as well as
+// importing it from the MCP server's `watch` command.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  startWatcher().catch((error: unknown) => {
+    logger.error("Fatal error starting Jules session watcher:", error);
+    process.exit(1);
   });
 }
