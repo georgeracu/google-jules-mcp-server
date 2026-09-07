@@ -51,6 +51,30 @@ describe("activity tool handlers", () => {
     expect(requests).toBe(3);
   });
 
+  it("listActivities fetches beyond 500 activities when limit exceeds the old page cap", async () => {
+    let requests = 0;
+    server.use(
+      http.get(`${BASE}/sessions/many/activities`, () => {
+        requests++;
+        const isLast = requests === 11;
+        const count = isLast ? 1 : 50;
+        return HttpResponse.json({
+          activities: Array.from({ length: count }, (_, i) => ({
+            name: `sessions/many/activities/a${requests}-${i}`,
+            id: `a${requests}-${i}`,
+            description: `Activity ${requests}-${i}`,
+          })),
+          nextPageToken: isLast ? undefined : `token-${requests + 1}`,
+        });
+      })
+    );
+
+    const result = await makeHandlers().listActivities({ sessionId: "many", limit: 501 });
+    expect(result.isError).toBeUndefined();
+    expect(requests).toBe(11);
+    expect(result.content[0].text).toContain("Activities for session many (501)");
+  });
+
   it("listActivities returns an error result on failure", async () => {
     server.use(
       http.get(`${BASE}/sessions/bad/activities`, () =>

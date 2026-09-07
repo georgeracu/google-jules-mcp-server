@@ -18,20 +18,15 @@ export function createActivityHandlers(client: ActivitiesClient) {
         const activities = [];
         let pageToken: string | undefined;
 
-        for (let page = 0; page < 10; page++) {
+        while (activities.length < limit) {
           const pageSize = Math.max(1, Math.min(50, limit - activities.length));
           const data = await client.listActivities(sessionId, { pageSize, pageToken });
           activities.push(...(data.activities ?? []));
-
-          if (activities.length >= limit) {
-            activities.splice(limit);
-            pageToken = data.nextPageToken;
-            break;
-          }
-
           pageToken = data.nextPageToken;
           if (!pageToken) break;
         }
+
+        if (activities.length > limit) activities.splice(limit);
 
         return textResult(formatActivityList({ activities, nextPageToken: pageToken }, sessionId));
       }),
