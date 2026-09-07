@@ -308,12 +308,10 @@ export function formatActivityList(data: ActivityList, sessionId: string): strin
   text += items.join("");
 
   if (items.length < total) {
-    text +=
-      `Showing ${items.length} of ${total} activities - output capped. ` +
-      `Re-run with a smaller limit to see the rest; pageToken skips past all ${total}.\n`;
+    text += `Showing ${items.length} of ${total} activities - output capped.\n`;
   }
   if (data.nextPageToken) {
-    text += `More activities available. Use pageToken: ${data.nextPageToken}\n`;
+    text += `More activities available. Re-run with a higher limit if needed.\n`;
   }
   return text;
 }

@@ -15,9 +15,33 @@ function makeHandlers() {
 
 describe("source tool handlers", () => {
   it("listSources returns a text result on success", async () => {
+    let requests = 0;
+    server.use(
+      http.get(`${BASE}/sources`, () => {
+        requests++;
+        if (requests === 1) {
+          return HttpResponse.json({
+            sources: [{ id: "github/acme/repo1", name: "sources/github/acme/repo1" }],
+            nextPageToken: "token-2",
+          });
+        } else if (requests === 2) {
+          return HttpResponse.json({
+            sources: undefined,
+            nextPageToken: "token-3",
+          });
+        }
+        return HttpResponse.json({
+          sources: [{ id: "github/acme/repo2", name: "sources/github/acme/repo2" }],
+        });
+      })
+    );
+
     const result = await makeHandlers().listSources({});
     expect(result.isError).toBeUndefined();
-    expect(result.content[0].text).toContain("Connected repositories");
+    expect(result.content[0].text).toContain("Connected repositories (2)");
+    expect(result.content[0].text).toContain("repo1");
+    expect(result.content[0].text).toContain("repo2");
+    expect(requests).toBe(3);
   });
 
   it("listSources returns an error result on failure", async () => {

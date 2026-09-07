@@ -18,9 +18,61 @@ function makeHandlers() {
 
 describe("activity tool handlers", () => {
   it("listActivities returns a text result on success", async () => {
-    const result = await makeHandlers().listActivities({ sessionId: "1234567890", limit: 10 });
+    let requests = 0;
+    server.use(
+      http.get(`${BASE}/sessions/1234567890/activities`, () => {
+        requests++;
+        if (requests === 1) {
+          return HttpResponse.json({
+            activities: [
+              { name: "sessions/1234567890/activities/a1", id: "a1", description: "Activity a1" },
+            ],
+            nextPageToken: "token-2",
+          });
+        } else if (requests === 2) {
+          return HttpResponse.json({
+            activities: undefined,
+            nextPageToken: "token-3",
+          });
+        }
+        return HttpResponse.json({
+          activities: [
+            { name: "sessions/1234567890/activities/a2", id: "a2", description: "Activity a2" },
+          ],
+        });
+      })
+    );
+
+    const result = await makeHandlers().listActivities({ sessionId: "1234567890", limit: 2 });
     expect(result.isError).toBeUndefined();
-    expect(result.content[0].text).toContain("Activities for session 1234567890");
+    expect(result.content[0].text).toContain("Activities for session 1234567890 (2)");
+    expect(result.content[0].text).toContain("a1");
+    expect(result.content[0].text).toContain("a2");
+    expect(requests).toBe(3);
+  });
+
+  it("listActivities fetches beyond 500 activities when limit exceeds the old page cap", async () => {
+    let requests = 0;
+    server.use(
+      http.get(`${BASE}/sessions/many/activities`, () => {
+        requests++;
+        const isLast = requests === 11;
+        const count = isLast ? 1 : 50;
+        return HttpResponse.json({
+          activities: Array.from({ length: count }, (_, i) => ({
+            name: `sessions/many/activities/a${requests}-${i}`,
+            id: `a${requests}-${i}`,
+            description: `Activity ${requests}-${i}`,
+          })),
+          nextPageToken: isLast ? undefined : `token-${requests + 1}`,
+        });
+      })
+    );
+
+    const result = await makeHandlers().listActivities({ sessionId: "many", limit: 501 });
+    expect(result.isError).toBeUndefined();
+    expect(requests).toBe(11);
+    expect(result.content[0].text).toContain("Activities for session many (501)");
   });
 
   it("listActivities returns an error result on failure", async () => {
