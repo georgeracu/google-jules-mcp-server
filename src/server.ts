@@ -18,6 +18,7 @@ export const TOOL_NAMES = [
   "jules_list_sources",
   "jules_get_source",
   "jules_create_session",
+  "jules_bulk_create_sessions",
   "jules_list_sessions",
   "jules_list_stuck_sessions",
   "jules_schedule_recurring_session",

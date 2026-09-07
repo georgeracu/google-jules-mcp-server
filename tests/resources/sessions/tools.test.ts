@@ -345,7 +345,7 @@ describe("session tool handlers", () => {
 });
 
 describe("registerSessionTools", () => {
-  it("registers all 15 session tools with a working handler", async () => {
+  it("registers all 16 session tools with a working handler", async () => {
     const mcpServer = new McpServer({ name: "test", version: "0.0.0" });
     const registerSpy = vi.spyOn(mcpServer, "registerTool");
     const httpClient = new JulesHttpClient("test-key", BASE);
@@ -359,6 +359,7 @@ describe("registerSessionTools", () => {
     const names = registerSpy.mock.calls.map((call) => call[0]);
     expect(names).toEqual([
       "jules_create_session",
+      "jules_bulk_create_sessions",
       "jules_list_sessions",
       "jules_list_stuck_sessions",
       "jules_schedule_recurring_session",
@@ -375,7 +376,7 @@ describe("registerSessionTools", () => {
       "jules_execute_and_wait",
     ]);
 
-    const getStatusHandler = registerSpy.mock.calls[6][2] as (args: object) => Promise<{
+    const getStatusHandler = registerSpy.mock.calls[7][2] as (args: object) => Promise<{
       content: Array<{ text: string }>;
     }>;
     const result = await getStatusHandler({ sessionId: "1234567890", includeActivities: 3 });
@@ -700,5 +701,82 @@ describe("repository allowlist", () => {
       if (previous === undefined) delete process.env.JULES_REPOSITORY_ALLOWLIST;
       else process.env.JULES_REPOSITORY_ALLOWLIST = previous;
     }
+  });
+});
+
+describe("bulkCreateSessions", () => {
+  const entries = [
+    { ...baseCreateInput, repoName: "one" },
+    { ...baseCreateInput, repoName: "two" },
+  ];
+  it("creates all requested sessions", async () => {
+    server.use(
+      http.post(`${BASE}/sessions`, async ({ request }) => {
+        const body = (await request.json()) as { sourceContext?: { source?: string } };
+        const id = body.sourceContext?.source?.endsWith("/one") ? "s1" : "s2";
+        return HttpResponse.json({ id, prompt: "p", state: "QUEUED" });
+      })
+    );
+    const result = await makeHandlers().bulkCreateSessions({ sessions: entries });
+    expect(result.content[0].text).toContain("one: s1");
+    expect(result.content[0].text).toContain("two: s2");
+  });
+  it("reports an individual failure without aborting the batch", async () => {
+    server.use(
+      http.post(`${BASE}/sessions`, async ({ request }) => {
+        const body = (await request.json()) as { sourceContext?: { source?: string } };
+        if (body.sourceContext?.source?.endsWith("/one"))
+          return HttpResponse.json({ error: { message: "no access" } }, { status: 403 });
+        return HttpResponse.json({ id: "s2", prompt: "p", state: "QUEUED" });
+      })
+    );
+    const result = await makeHandlers().bulkCreateSessions({ sessions: entries });
+    expect(result.content[0].text).toContain("one: error");
+    expect(result.content[0].text).toContain("two: s2");
+  });
+  it("handles an empty batch", async () => {
+    const result = await makeHandlers().bulkCreateSessions({ sessions: [] });
+    expect(result.content[0].text).toContain("No sessions requested");
+  });
+  it("rejects batches larger than 20 entries", async () => {
+    const result = await makeHandlers().bulkCreateSessions({
+      sessions: Array.from({ length: 21 }, (_, i) => ({ ...baseCreateInput, repoName: String(i) })),
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("maximum of 20");
+  });
+  it("uses unknown when a created session has no state", async () => {
+    const handlers = createSessionHandlers(
+      { createSession: vi.fn().mockResolvedValue({ id: "nostate" }) } as never,
+      {} as ActivitiesClient
+    );
+    const result = await handlers.bulkCreateSessions({ sessions: [entries[0]] });
+    expect(result.content[0].text).toContain("one: nostate (unknown)");
+  });
+
+  it("reports allowlist rejections per entry", async () => {
+    const previous = process.env.JULES_REPOSITORY_ALLOWLIST;
+    process.env.JULES_REPOSITORY_ALLOWLIST = "acme/two";
+    try {
+      server.use(http.post(`${BASE}/sessions`, () => HttpResponse.json({ id: "s2", prompt: "p" })));
+      const result = await makeHandlers().bulkCreateSessions({ sessions: entries });
+      expect(result.content[0].text).toContain("one: error");
+      expect(result.content[0].text).toContain("two: s2");
+    } finally {
+      if (previous === undefined) delete process.env.JULES_REPOSITORY_ALLOWLIST;
+      else process.env.JULES_REPOSITORY_ALLOWLIST = previous;
+    }
+  });
+
+  it("accepts exactly 20 entries", async () => {
+    server.use(http.post(`${BASE}/sessions`, () => HttpResponse.json({ id: "ok", prompt: "p" })));
+    const result = await makeHandlers().bulkCreateSessions({
+      sessions: Array.from({ length: 20 }, (_, i) => ({
+        ...baseCreateInput,
+        repoName: `repo-${i}`,
+      })),
+    });
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text.split("\n")).toHaveLength(20);
   });
 });

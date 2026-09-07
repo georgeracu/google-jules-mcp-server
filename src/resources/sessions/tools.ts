@@ -140,6 +140,44 @@ export function createSessionHandlers(
   };
 
   return {
+    bulkCreateSessions: ({
+      sessions: entries,
+    }: {
+      sessions: Array<{
+        repoOwner: string;
+        repoName: string;
+        prompt: string;
+        branch: string;
+        autoApprove: boolean;
+        autoCreatePR: boolean;
+        title?: string;
+      }>;
+    }): Promise<ToolResult> =>
+      wrap("Error creating sessions", async () => {
+        if (entries.length > 20)
+          throw new Error("A maximum of 20 sessions may be created at once.");
+        if (entries.length === 0) return textResult("No sessions requested.");
+        const results: string[] = [];
+        for (const entry of entries) {
+          try {
+            if (!isRepositoryAllowed(entry.repoOwner, entry.repoName)) {
+              throw new Error(
+                `Repository ${entry.repoOwner}/${entry.repoName} is not permitted by JULES_REPOSITORY_ALLOWLIST`
+              );
+            }
+            const session = await sessions.createSession(buildSessionRequest(entry));
+            results.push(
+              `${entry.repoOwner}/${entry.repoName}: ${session.id} (${session.state ?? "unknown"})`
+            );
+          } catch (error) {
+            results.push(
+              `${entry.repoOwner}/${entry.repoName}: error — ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+        return textResult(results.join("\n"));
+      }),
+
     createSession: ({
       repoOwner,
       repoName,
@@ -439,6 +477,31 @@ export function registerSessionTools(
       },
     },
     handlers.createSession
+  );
+
+  server.registerTool(
+    "jules_bulk_create_sessions",
+    {
+      title: "Bulk Create Jules Sessions",
+      description:
+        "Create sessions across multiple repositories, reporting each result independently.",
+      inputSchema: {
+        sessions: z
+          .array(
+            z.object({
+              repoOwner: z.string(),
+              repoName: z.string(),
+              prompt: z.string(),
+              branch: z.string().default("main"),
+              autoApprove: z.boolean().default(true),
+              autoCreatePR: z.boolean().default(false),
+              title: z.string().optional(),
+            })
+          )
+          .describe("Session requests to create"),
+      },
+    },
+    handlers.bulkCreateSessions
   );
 
   server.registerTool(
