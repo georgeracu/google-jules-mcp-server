@@ -10,3 +10,14 @@ export function getApiKey(): string {
   }
   return apiKey;
 }
+
+/** Returns whether session creation is permitted for an owner/repo pair. */
+export function isRepositoryAllowed(repoOwner: string, repoName: string): boolean {
+  const raw = process.env.JULES_REPOSITORY_ALLOWLIST;
+  if (!raw || raw.trim() === "") return true;
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .includes(`${repoOwner}/${repoName}`);
+}

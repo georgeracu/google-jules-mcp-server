@@ -687,3 +687,18 @@ describe("recurring session tool handlers", () => {
     expect((await h.cancelRecurringSchedule({ scheduleId: "missing" })).isError).toBe(true);
   });
 });
+
+describe("repository allowlist", () => {
+  it("rejects session creation for repositories outside the configured allowlist", async () => {
+    const previous = process.env.JULES_REPOSITORY_ALLOWLIST;
+    process.env.JULES_REPOSITORY_ALLOWLIST = "acme/allowed";
+    try {
+      const result = await makeHandlers().createSession(baseCreateInput);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not permitted");
+    } finally {
+      if (previous === undefined) delete process.env.JULES_REPOSITORY_ALLOWLIST;
+      else process.env.JULES_REPOSITORY_ALLOWLIST = previous;
+    }
+  });
+});

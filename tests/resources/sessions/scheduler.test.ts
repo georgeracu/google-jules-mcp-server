@@ -49,3 +49,37 @@ it("logs failures when creating a scheduled session", async () => {
   });
   expect(sessions.createSession).toHaveBeenCalled();
 });
+
+it("allows matching repositories through the allowlist check", async () => {
+  const previous = process.env.JULES_REPOSITORY_ALLOWLIST;
+  delete process.env.JULES_REPOSITORY_ALLOWLIST;
+  const sessions = { createSession: vi.fn().mockResolvedValue({}) };
+  const scheduler = new SessionScheduler(sessions as never, "/tmp/unused-schedules.json");
+  try {
+    await (scheduler as unknown as { fire: (s: unknown) => Promise<void> }).fire({
+      id: "allowed",
+      request,
+    });
+    expect(sessions.createSession).toHaveBeenCalledWith(request);
+  } finally {
+    if (previous === undefined) delete process.env.JULES_REPOSITORY_ALLOWLIST;
+    else process.env.JULES_REPOSITORY_ALLOWLIST = previous;
+  }
+});
+
+it("skips repositories excluded by the allowlist", async () => {
+  const previous = process.env.JULES_REPOSITORY_ALLOWLIST;
+  process.env.JULES_REPOSITORY_ALLOWLIST = "other/repo";
+  const sessions = { createSession: vi.fn().mockResolvedValue({}) };
+  const scheduler = new SessionScheduler(sessions as never, "/tmp/unused-schedules.json");
+  try {
+    await (scheduler as unknown as { fire: (s: unknown) => Promise<void> }).fire({
+      id: "blocked",
+      request,
+    });
+    expect(sessions.createSession).not.toHaveBeenCalled();
+  } finally {
+    if (previous === undefined) delete process.env.JULES_REPOSITORY_ALLOWLIST;
+    else process.env.JULES_REPOSITORY_ALLOWLIST = previous;
+  }
+});

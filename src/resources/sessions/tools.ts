@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import type { ActivitiesClient } from "../activities/client.js";
+import { isRepositoryAllowed } from "../../core/config.js";
 import { textResult, wrap, type ToolResult } from "../../core/tool-result.js";
 import { PageParams } from "../../shared/pagination.js";
 import type { SessionsClient } from "./client.js";
@@ -159,6 +160,11 @@ export function createSessionHandlers(
       wrap(
         "Error creating session",
         async () => {
+          if (!isRepositoryAllowed(repoOwner, repoName)) {
+            throw new Error(
+              `Repository ${repoOwner}/${repoName} is not permitted by JULES_REPOSITORY_ALLOWLIST`
+            );
+          }
           const request = buildSessionRequest({
             repoOwner,
             repoName,
