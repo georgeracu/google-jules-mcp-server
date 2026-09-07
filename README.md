@@ -287,6 +287,12 @@ _Via local clone:_
 JULES_API_KEY=your_key JULES_WATCH_WEBHOOK_URL=https://hooks.slack.com/services/... node build/index.js watch
 ```
 
+The watcher can also be run directly from a built checkout:
+
+```bash
+JULES_API_KEY=your_key JULES_WATCH_WEBHOOK_URL=https://your.webhook.url/here node build/watch.js
+```
+
 _Example PM2 configuration (`ecosystem.config.js`):_
 
 ```javascript
