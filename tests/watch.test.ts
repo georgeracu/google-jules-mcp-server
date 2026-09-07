@@ -1,5 +1,6 @@
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it, vi } from "vitest";
 
 import { JULES_API_BASE } from "../src/core/config.js";
 import { JulesHttpClient } from "../src/core/http-client.js";
@@ -196,6 +197,27 @@ describe("watcher", () => {
   });
 
   describe("startWatcher", () => {
+    it("handles a startup failure when run as the direct entrypoint", async () => {
+      vi.resetModules();
+      const originalArg = process.argv[1];
+      const originalWebhook = process.env.JULES_WATCH_WEBHOOK_URL;
+      process.argv[1] = fileURLToPath(new URL("../src/watch.ts", import.meta.url));
+      process.env.JULES_API_KEY = "fake-key";
+      delete process.env.JULES_WATCH_WEBHOOK_URL;
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+
+      try {
+        await import("../src/watch.js");
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(exitSpy).toHaveBeenCalledWith(1);
+      } finally {
+        process.argv[1] = originalArg;
+        if (originalWebhook === undefined) delete process.env.JULES_WATCH_WEBHOOK_URL;
+        else process.env.JULES_WATCH_WEBHOOK_URL = originalWebhook;
+        exitSpy.mockRestore();
+      }
+    });
+
     it("throws if JULES_WATCH_WEBHOOK_URL is not set", async () => {
       process.env.JULES_API_KEY = "fake-key";
       delete process.env.JULES_WATCH_WEBHOOK_URL;
