@@ -1,7 +1,13 @@
 import type { z } from "zod";
 
 export type JulesApiErrorKind =
-  "auth" | "not_found" | "rate_limit" | "server" | "client" | "network" | "validation";
+  | "auth"
+  | "not_found"
+  | "rate_limit"
+  | "server"
+  | "client"
+  | "network"
+  | "validation";
 
 export interface JulesApiErrorOptions {
   kind: JulesApiErrorKind;
