@@ -143,6 +143,23 @@ describe("JulesHttpClient", () => {
     );
   });
 
+  it("adds a 30s timeout signal to requests if none is provided", async () => {
+    const fetchSpy: typeof fetch = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const client = makeClient();
+    await client.request("/ping", z.object({ ok: z.boolean() }));
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [, calledInit] = vi.mocked(fetchSpy).mock.calls[0];
+
+    expect(calledInit?.signal).toBeInstanceOf(AbortSignal);
+
+    vi.unstubAllGlobals();
+  });
+
   describe("proxy transport", () => {
     afterEach(() => {
       vi.unstubAllGlobals();
