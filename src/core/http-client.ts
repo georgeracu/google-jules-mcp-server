@@ -45,7 +45,7 @@ export class JulesHttpClient {
   async request<S extends z.ZodTypeAny>(
     path: string,
     schema: S,
-    init: RequestInit = {}
+    init?: RequestInit
   ): Promise<z.infer<S>> {
     const raw = await this.rawJson(path, init);
     const parsed = schema.safeParse(raw);
@@ -59,26 +59,26 @@ export class JulesHttpClient {
   }
 
   /** For endpoints whose response body is empty or not needed (delete, archive, unarchive, send-message). */
-  async requestVoid(path: string, init: RequestInit = {}): Promise<void> {
+  async requestVoid(path: string, init?: RequestInit): Promise<void> {
     await this.rawJson(path, init);
   }
 
-  private rawJson(path: string, init: RequestInit): Promise<unknown> {
+  private rawJson(path: string, init?: RequestInit): Promise<unknown> {
     return retryWithBackoff(() => this.rawFetch(path, init), this.retryPolicy);
   }
 
-  private async rawFetch(path: string, init: RequestInit): Promise<unknown> {
+  private async rawFetch(path: string, init?: RequestInit): Promise<unknown> {
     const url = `${this.baseUrl}${path}`;
     let response: Response;
     try {
       response = await currentFetch()(url, {
         ...init,
-        signal: init.signal ?? AbortSignal.timeout(30000),
+        signal: init?.signal ?? AbortSignal.timeout(30000),
         dispatcher: proxyDispatcher,
         headers: {
           "X-Goog-Api-Key": this.apiKey,
           "Content-Type": "application/json",
-          ...init.headers,
+          ...init?.headers,
         },
       });
     } catch (error) {
