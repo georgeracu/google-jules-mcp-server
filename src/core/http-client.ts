@@ -73,6 +73,7 @@ export class JulesHttpClient {
     try {
       response = await currentFetch()(url, {
         ...init,
+        signal: init.signal ?? AbortSignal.timeout(30000),
         dispatcher: proxyDispatcher,
         headers: {
           "X-Goog-Api-Key": this.apiKey,
