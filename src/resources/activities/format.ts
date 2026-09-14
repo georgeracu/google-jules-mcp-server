@@ -64,10 +64,7 @@ export function formatChangeSet(
         diffText =
           diffText.slice(0, CHANGE_SET_DIFF_CHAR_BUDGET) + `...\n${formatOmittedNote(omitted)}`;
       }
-      const indentedDiff = diffText
-        .split("\n")
-        .map((line) => (line ? `${indent}  ${line}` : ""))
-        .join("\n");
+      const indentedDiff = diffText.replace(/^(?=.)/gm, `${indent}  `);
       res += indentedDiff + "\n";
     }
   }
