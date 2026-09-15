@@ -38,16 +38,16 @@ describe("errorResult", () => {
 
 describe("wrap", () => {
   it("returns the result of a successful function", async () => {
-    const result = await wrap("test_label", async () => textResult("success"));
+    const result = await wrap("test_label", () => Promise.resolve(textResult("success")));
     expect(result).toEqual({
       content: [{ type: "text", text: "success" }],
     });
   });
 
   it("catches errors and formats them with the provided label", async () => {
-    const result = await wrap("operation_failed", async () => {
-      throw new Error("something went wrong");
-    });
+    const result = await wrap("operation_failed", () =>
+      Promise.reject(new Error("something went wrong"))
+    );
     expect(result).toEqual({
       content: [{ type: "text", text: "operation_failed: something went wrong" }],
       isError: true,
@@ -57,9 +57,7 @@ describe("wrap", () => {
   it("includes the suffix in formatted errors", async () => {
     const result = await wrap(
       "operation_failed",
-      async () => {
-        throw new Error("something went wrong");
-      },
+      () => Promise.reject(new Error("something went wrong")),
       ". Please try again."
     );
     expect(result).toEqual({
@@ -71,9 +69,8 @@ describe("wrap", () => {
   });
 
   it("handles non-Error objects thrown", async () => {
-    const result = await wrap("unknown_error", async () => {
-      throw "string error";
-    });
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+    const result = await wrap("unknown_error", () => Promise.reject("string error"));
     expect(result).toEqual({
       content: [{ type: "text", text: "unknown_error: An unknown error occurred" }],
       isError: true,
