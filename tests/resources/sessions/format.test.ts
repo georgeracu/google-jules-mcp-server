@@ -52,6 +52,10 @@ describe("formatStuckSessionList", () => {
     expect(formatStuckSessionList({ sessions: [] })).toContain("No stuck sessions found");
   });
 
+  it("renders a clear message when the sessions array is undefined", () => {
+    expect(formatStuckSessionList({} as any)).toContain("No stuck sessions found");
+  });
+
   it("formats the fields needed to act on a stuck session", () => {
     const text = formatStuckSessionList({
       sessions: [
@@ -87,6 +91,21 @@ describe("formatStuckSessionList", () => {
     expect(text).toContain("Untitled");
     expect(text).toContain("URL: unknown");
     expect(text).toContain("Updated: unknown");
+  });
+
+  it("uses fallbacks for missing title specifically", () => {
+    const text = formatStuckSessionList({
+      sessions: [
+        {
+          id: "approval-3",
+          title: undefined,
+          prompt: "Review the plan",
+          state: "AWAITING_PLAN_APPROVAL",
+        },
+      ],
+    });
+
+    expect(text).toContain("Untitled");
   });
 });
 
@@ -294,6 +313,12 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
     expect(text).toContain("Recent Activities (7):");
   });
 
+  it("formats wait resolution with missing session title", () => {
+    const sessionWithoutTitle = { ...sessionCompletedFixture, title: undefined };
+    const text = formatWaitResolution(sessionWithoutTitle, {});
+    expect(text).toContain("Title: Untitled");
+  });
+
   it("formats completed state with PR without a number and with empty activities", () => {
     const sessionWithNoPrNumber = {
       ...sessionCompletedFixture,
@@ -407,6 +432,12 @@ describe("formatWaitResolution and formatWaitTimeout", () => {
     const text = formatWaitTimeout(sessionCompletedFixture, {}, 60);
     expect(text).toContain("Session Wait Time Limit Reached (60s)!");
     expect(text).not.toContain("Recent Activities");
+  });
+
+  it("formats wait timeout with missing session title", () => {
+    const sessionWithoutTitle = { ...sessionCompletedFixture, title: undefined };
+    const text = formatWaitTimeout(sessionWithoutTitle, {}, 60);
+    expect(text).toContain("Title: Untitled");
   });
 
   it("formats wait timeout with activities missing originator", () => {
