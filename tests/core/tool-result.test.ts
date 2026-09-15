@@ -63,7 +63,9 @@ describe("wrap", () => {
       ". Please try again."
     );
     expect(result).toEqual({
-      content: [{ type: "text", text: "operation_failed: something went wrong. Please try again." }],
+      content: [
+        { type: "text", text: "operation_failed: something went wrong. Please try again." },
+      ],
       isError: true,
     });
   });
