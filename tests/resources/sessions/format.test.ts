@@ -53,7 +53,7 @@ describe("formatStuckSessionList", () => {
   });
 
   it("renders a clear message when the sessions array is undefined", () => {
-    expect(formatStuckSessionList({} as any)).toContain("No stuck sessions found");
+    expect(formatStuckSessionList({})).toContain("No stuck sessions found");
   });
 
   it("formats the fields needed to act on a stuck session", () => {
