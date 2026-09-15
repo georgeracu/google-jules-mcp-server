@@ -38,7 +38,7 @@ export async function pollStuckSessions(
     }
 
     // Process found stuck sessions
-    for (const session of stuckSessions) {
+    const notifyPromises = stuckSessions.map(async (session) => {
       const prevState = seenStates.get(session.id);
       if (prevState !== session.state) {
         // State changed to stuck, or new stuck session
@@ -68,7 +68,9 @@ export async function pollStuckSessions(
           logger.error("Failed to POST to webhook:", error);
         }
       }
-    }
+    });
+
+    await Promise.all(notifyPromises);
   } catch (error) {
     logger.error("Error polling stuck sessions:", error);
   }
