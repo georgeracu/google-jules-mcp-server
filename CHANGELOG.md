@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.1](https://github.com/georgeracu/google-jules-mcp-server/compare/google-jules-mcp-server-v0.4.0...google-jules-mcp-server-v0.4.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **security:** add missing timeout on fetch calls ([#103](https://github.com/georgeracu/google-jules-mcp-server/issues/103)) ([a44ffbf](https://github.com/georgeracu/google-jules-mcp-server/commit/a44ffbf2bad03a23446ae3de5e9813328a008d7c))
+
+
+### Performance Improvements
+
+* **format:** optimize string splitting for indented diffs ([#105](https://github.com/georgeracu/google-jules-mcp-server/issues/105)) ([df7ced6](https://github.com/georgeracu/google-jules-mcp-server/commit/df7ced652b68c39fb3f14cc25c417c172f2df504))
+* parallelize webhook notifications in watcher ([#109](https://github.com/georgeracu/google-jules-mcp-server/issues/109)) ([bf3b09f](https://github.com/georgeracu/google-jules-mcp-server/commit/bf3b09fbd14b9169f3d8cd3dff6787feb70ad779))
+
 ## [0.4.0](https://github.com/georgeracu/google-jules-mcp-server/compare/google-jules-mcp-server-v0.3.2...google-jules-mcp-server-v0.4.0) (2026-09-08)
 
 
