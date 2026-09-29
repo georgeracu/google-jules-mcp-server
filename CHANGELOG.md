@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/georgeracu/google-jules-mcp-server/compare/google-jules-mcp-server-v0.4.1...google-jules-mcp-server-v0.4.2) (2026-09-29)
+
+
+### Bug Fixes
+
+* remove redundant fetch type assertion ([8a089af](https://github.com/georgeracu/google-jules-mcp-server/commit/8a089af1313c335f6508e95cf384d0593237db1d))
+
 ## [0.4.1](https://github.com/georgeracu/google-jules-mcp-server/compare/google-jules-mcp-server-v0.4.0...google-jules-mcp-server-v0.4.1) (2026-09-15)
 
 
