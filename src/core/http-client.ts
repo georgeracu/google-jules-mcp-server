@@ -27,7 +27,7 @@ const proxyDispatcher: NonNullable<RequestInit["dispatcher"]> | undefined = PROX
 
 /** Read per request rather than captured: globalThis.fetch is what mocks replace. */
 function currentFetch(): typeof globalThis.fetch {
-  return proxyDispatcher ? (undiciFetch as unknown as typeof globalThis.fetch) : globalThis.fetch;
+  return proxyDispatcher ? undiciFetch : globalThis.fetch;
 }
 
 /**
