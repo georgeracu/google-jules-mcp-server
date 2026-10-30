@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.3](https://github.com/georgeracu/google-jules-mcp-server/compare/google-jules-mcp-server-v0.4.2...google-jules-mcp-server-v0.4.3) (2026-10-30)
+
+
+### Dependencies
+
+* Bump @modelcontextprotocol/sdk from 1.30.1 to 1.32.2 ([#132](https://github.com/georgeracu/google-jules-mcp-server/pull/132), [#139](https://github.com/georgeracu/google-jules-mcp-server/pull/139))
+* Bump @types/node from 26.6.3 to 26.6.5 ([#133](https://github.com/georgeracu/google-jules-mcp-server/pull/133))
+* Bump @vitest/coverage-v8 from 5.0.3 to 5.0.5 ([#136](https://github.com/georgeracu/google-jules-mcp-server/pull/136))
+* Bump eslint from 10.11.0 to 10.13.0 ([#131](https://github.com/georgeracu/google-jules-mcp-server/pull/131), [#141](https://github.com/georgeracu/google-jules-mcp-server/pull/141))
+* Bump prettier from 3.9.8 to 3.9.10 ([#137](https://github.com/georgeracu/google-jules-mcp-server/pull/137))
+* Bump typescript-eslint from 8.70.1 to 8.72.0 ([#125](https://github.com/georgeracu/google-jules-mcp-server/pull/125), [#130](https://github.com/georgeracu/google-jules-mcp-server/pull/130), [#142](https://github.com/georgeracu/google-jules-mcp-server/pull/142))
+* Bump undici from 8.10.2 to 8.12.3 ([#127](https://github.com/georgeracu/google-jules-mcp-server/pull/127), [#140](https://github.com/georgeracu/google-jules-mcp-server/pull/140))
+* Bump vitest from 5.0.2 to 5.0.5 ([#128](https://github.com/georgeracu/google-jules-mcp-server/pull/128), [#135](https://github.com/georgeracu/google-jules-mcp-server/pull/135))
+* Bump zod from 4.6.5 to 4.6.7 ([#138](https://github.com/georgeracu/google-jules-mcp-server/pull/138))
+
 ## [0.4.2](https://github.com/georgeracu/google-jules-mcp-server/compare/google-jules-mcp-server-v0.4.1...google-jules-mcp-server-v0.4.2) (2026-09-29)
 
 
