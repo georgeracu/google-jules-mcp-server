@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/georgeracu/google-jules-mcp-server/compare/google-jules-mcp-server-v0.5.0...google-jules-mcp-server-v0.5.1) (2026-11-27)
+
+
+### Miscellaneous Chores
+
+* release 0.5.1 ([#157](https://github.com/georgeracu/google-jules-mcp-server/issues/157)) ([f43b998](https://github.com/georgeracu/google-jules-mcp-server/commit/f43b99876b12da4544a39183aba6be460ec14b6e))
+
 ## [0.5.0](https://github.com/georgeracu/google-jules-mcp-server/compare/google-jules-mcp-server-v0.4.3...google-jules-mcp-server-v0.5.0) (2026-10-30)
 
 
