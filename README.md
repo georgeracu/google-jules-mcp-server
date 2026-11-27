@@ -7,7 +7,7 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/georgeracu/google-jules-mcp-server)
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/georgeracu/google-jules-mcp-server?utm_source=oss&utm_medium=github&utm_campaign=georgeracu%2Fgoogle-jules-mcp-server&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)](https://coderabbit.ai)
 
-If you're searching for a way to drive Google's Jules coding agent from Claude, Cursor, VS Code Copilot, or any other MCP client, this is that bridge. `google-jules-mcp-server` is an unofficial Model Context Protocol server that exposes the full Jules API (v1alpha) as 13 tools, so your assistant can create sessions, poll status, approve plans, and fetch the resulting pull request without you leaving the chat.
+If you're searching for a way to drive Google's Jules coding agent from Claude, Cursor, VS Code Copilot, or any other MCP client, this is that bridge. `google-jules-mcp-server` is an unofficial Model Context Protocol server that exposes the full Jules API (v1alpha) as 20 tools, so your assistant can create sessions, poll status, approve plans, and fetch the resulting pull request without you leaving the chat.
 
 Developers running Jules across many repositories at once use it to let their AI assistant manage the whole async workflow: kick off a task, check on it later, and hand back a PR link when it's done, instead of switching to the Jules web app to babysit progress. Every response is validated at runtime through Zod schemas, so a drifted Jules API response fails loudly rather than silently breaking downstream code.
 
@@ -15,7 +15,7 @@ Model Context Protocol (MCP) server for Google's Jules AI coding agent — unoff
 
 ## Overview
 
-Jules is Google's AI coding agent that executes development tasks in isolated cloud VMs — generating code, fixing bugs, writing tests, updating dependencies, and refactoring across files. This server exposes the full Jules API surface as 13 MCP tools, covering repository sources, session lifecycle, and activity logs.
+Jules is Google's AI coding agent that executes development tasks in isolated cloud VMs — generating code, fixing bugs, writing tests, updating dependencies, and refactoring across files. This server exposes the full Jules API surface as 20 MCP tools, covering repository sources, session lifecycle, and activity logs.
 
 Tasks run asynchronously and typically complete in 5–60 minutes depending on complexity.
 
@@ -201,28 +201,32 @@ Restart your client after editing its config.
 
 ### 4. Verify
 
-Ask your assistant: "List my Jules repositories." You should see the `jules` server connected with 16 tools available.
+Ask your assistant: "List my Jules repositories." You should see the `jules` server connected with 20 tools available.
 
 ## Available Tools
 
-| Tool                        | Purpose                                                                                   |
-| --------------------------- | ----------------------------------------------------------------------------------------- |
-| `jules_list_sources`        | List GitHub repositories connected to Jules                                               |
-| `jules_get_source`          | Get details (branches, visibility) for one connected repository                           |
-| `jules_create_session`      | Start a new asynchronous coding task                                                      |
-| `jules_list_sessions`       | List sessions and their states                                                            |
-| `jules_list_stuck_sessions` | List sessions awaiting plan approval or user feedback, following pagination automatically |
-| `jules_get_status`          | Check a session's status and recent activity                                              |
-| `jules_send_message`        | Send a follow-up instruction to a running session                                         |
-| `jules_approve_plan`        | Approve a session's execution plan (when `requirePlanApproval` was set)                   |
-| `jules_get_session_output`  | Retrieve the final output (PR details) of a completed session                             |
-| `jules_delete_session`      | Permanently delete a session                                                              |
-| `jules_archive_session`     | Archive a session without deleting it                                                     |
-| `jules_unarchive_session`   | Restore an archived session                                                               |
-| `jules_wait_for_session`    | Wait/poll for a session to reach a terminal state                                         |
-| `jules_execute_and_wait`    | Create a session and wait for it to complete in one call                                  |
-| `jules_list_activities`     | Get a session's detailed activity log                                                     |
-| `jules_get_activity`        | Get a single activity by ID                                                               |
+| Tool                               | Purpose                                                                                   |
+| ---------------------------------- | ----------------------------------------------------------------------------------------- |
+| `jules_list_sources`               | List GitHub repositories connected to Jules                                               |
+| `jules_get_source`                 | Get details (branches, visibility) for one connected repository                           |
+| `jules_create_session`             | Start a new asynchronous coding task                                                      |
+| `jules_bulk_create_sessions`       | Create sessions across multiple repositories, reporting each result independently         |
+| `jules_list_sessions`              | List sessions and their states                                                            |
+| `jules_list_stuck_sessions`        | List sessions awaiting plan approval or user feedback, following pagination automatically |
+| `jules_schedule_recurring_session` | Create a persistent cron schedule for recurring sessions                                  |
+| `jules_list_recurring_schedules`   | List persistent recurring session schedules                                               |
+| `jules_cancel_recurring_schedule`  | Cancel a recurring session schedule                                                       |
+| `jules_get_status`                 | Check a session's status and recent activity                                              |
+| `jules_send_message`               | Send a follow-up instruction to a running session                                         |
+| `jules_approve_plan`               | Approve a session's execution plan (when `requirePlanApproval` was set)                   |
+| `jules_get_session_output`         | Retrieve the final output (PR details) of a completed session                             |
+| `jules_delete_session`             | Permanently delete a session                                                              |
+| `jules_archive_session`            | Archive a session without deleting it                                                     |
+| `jules_unarchive_session`          | Restore an archived session                                                               |
+| `jules_wait_for_session`           | Wait/poll for a session to reach a terminal state                                         |
+| `jules_execute_and_wait`           | Create a session and wait for it to complete in one call                                  |
+| `jules_list_activities`            | Get a session's detailed activity log                                                     |
+| `jules_get_activity`               | Get a single activity by ID                                                               |
 
 ## Output Size and Pagination
 
